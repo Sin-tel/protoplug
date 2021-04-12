@@ -1,3 +1,9 @@
+--[[
+Spectral warping
+some parts based on Mutable Instruments Clouds "Spectral Madness"
+see: https://github.com/pichenettes/eurorack/tree/master/clouds/dsp/pvoc
+]]
+
 require "include/protoplug"
 
 stereoFx.init()
@@ -21,6 +27,9 @@ pitch = 1.0
 phase_random = 0
 feedback = 0
 quantize = 1
+freeze = false
+normalize = 0
+warp = 0
 
 -- useful constants
 local lineMax = fftSize
@@ -34,6 +43,16 @@ local dbuf = ffi.new("double[?]", fftSize)
 local spectrum = ffi.new("fftw_complex[?]", cplxSize)
 local r2c = fftlib.fftw_plan_dft_r2c_1d(fftSize, dbuf, spectrum, 64)
 local c2r = fftlib.fftw_plan_dft_c2r_1d(fftSize, spectrum, dbuf, 64)
+
+local warpPolynomials = {
+  { 0.0, 0.0, 1.0, 0.0 },
+  { 0.0, 0.2, 0.8, 0.0 },
+  { -1.4, 0.8, 0.6, 0.0 },
+  { -7.3333, 9.0, -1.79167, 0.125 },
+  { -7.3333, 9.0, -1.79167, 0.125 },
+};
+
+
 
 
 local hw  = ffi.new("double[?]", fftSize) -- Hann window
@@ -73,33 +92,56 @@ local function ApplyFilter(self)
 	
 	local pitch_ignore = pitch == 1.0 --math.abs(pitch - 1.0) < 0.01
 	-- cartesian to polar
-	for i=0,cplxSize-1 do
-		local real = spectrum[i][0] 
-		local imag = spectrum[i][1] 
-		local mag = 2*math.sqrt(real*real+imag*imag)
-		local angle = math.atan2(imag, real)
+	if not freeze then
+        for i=0,cplxSize-1 do
+            local real = spectrum[i][0] 
+            local imag = spectrum[i][1] 
+            local mag = 2*math.sqrt(real*real+imag*imag)
+            local angle = math.atan2(imag, real)
 		
-		self.mag[i] = mag*(1-feedback) + self.feedb_buf[i]*feedback
+            self.mag[i] = mag*(1-feedback) + self.feedb_buf[i]*feedback
 		
 
-		self.feedb_buf[i] = self.mag[i]
-		self.phase_delta[i] = angle - self.phase[i]
+            self.feedb_buf[i] = self.mag[i]
+            self.phase_delta[i] = (angle - self.phase[i]  + math.pi)%(2*math.pi) - math.pi 
 		
 		
-		if pitch_ignore then
-		    self.syn_phase[i] = angle
-		end
-	end
+            --[[if pitch_ignore then
+                self.phase[i] = angle
+            end]]
+        end
+    else
+        for i=0,cplxSize-1 do
+            self.phase[i] =  self.phase[i] + self.phase_delta[i] 
+        end
+    end
 	-- processing magnitudes
 	
-	if pitch_ignore then
+	--[[if pitch_ignore then
         for i=0,cplxSize-1 do
             self.syn_mag[i] = self.mag[i]
+            self.syn_phase[i] = self.phase[i]
         end
-	else
-        local i2 = 1
+	else]]
+	    local coef = {0,0,1,0} 
+	    local pind = math.floor(warp) 
+        local pfrac = warp - math.floor(warp)
+        
+        for i = 1,4 do
+            local a = warpPolynomials[pind][i]
+            local b = warpPolynomials[pind+1][i]
+            coef[i] = a + (b - a)*pfrac
+        end
+	    
+	
+        local i2 = 0
         local increment = 1/pitch
-        for i=1,cplxSize-1 do
+        for i=0,cplxSize-1 do
+            local x = i / (cplxSize-1)
+            x = coef[4] + x*(coef[3] +x*(coef[2] + x*coef[1]))
+            x = x*(cplxSize-1)
+            
+            i2 = x*increment
             local ind = math.floor(i2)
             local frac = i2 - math.floor(i2)
 	    
@@ -120,23 +162,41 @@ local function ApplyFilter(self)
                 
                 self.syn_phase[i] = (ph_a  + (ph_b  - ph_a ) * frac + math.pi + delta*pitch)%(2*math.pi) - math.pi 
             end
-            i2 = i2 + increment
+            
+        end
+    --end
+
+    --update mag
+    local max = 0
+    for i=0,cplxSize-1 do
+        if self.syn_mag[i] > max then
+            max = self.syn_mag[i]
         end
     end
-
-
+    local invmax = 1/max
+    
+    
 	local invquant = 1 / quantize
 	
 	for i=0,cplxSize-1 do
+	    self.syn_mag[i] = self.syn_mag[i]*invmax
         if quantize > 0 then
             self.syn_mag[i] = invquant*math.floor(self.syn_mag[i]*quantize)
         end
+        local x = self.syn_mag[i]
+        local w = 2*x * (1-x) * (1-x) * (1-x)
         
-        --set all magnitudes constant (lol)
-        --self.syn_mag[i] = 1
         
+        self.syn_mag[i] = (x + (w-x)*normalize)*max
+    end
+    
+    
+    -- update phases
+    for i=0,cplxSize-1 do
         
-		self.phase[i] = self.syn_phase[i] 
+        if not freeze then
+		    self.phase[i] = self.syn_phase[i] 
+		end
 		
 		self.syn_phase[i] = self.syn_phase[i] + 6*phase_random*math.random()
 	end
@@ -207,7 +267,15 @@ params = plugin.manageParams {
 		max = 1;
 		type = "double";
 		default = 0;
-		changed = function(val) feedback = val end;
+		changed = function(val) feedback = val*(2-val) end;
+	};
+	{
+		name = "normalize";
+		min = 0;
+		max = 1;
+		type = "double";
+		default = 0;
+		changed = function(val) normalize = val end;
 	};
 	{
 		name = "quantize";
@@ -217,11 +285,26 @@ params = plugin.manageParams {
 		default = 0;
 		changed = function(val) 
 		if val > 0 then
-		    quantize = 2*(1-val)*(1-val)+0.0001 
+		    quantize = 255*(1-val)*(1-val)+0.0001 
 		else
 		    quantize = 0
 		end
 		
 		end;
+	};
+	{
+		name = "warp";
+		min = 1;
+		max = 4;
+		type = "double";
+		default = 0;
+		changed = function(val) warp = val end;
+	};
+	{
+		name = "freeze";
+		type = "list";
+		values = {"off"; "on"};
+		default = "off";
+		changed = function(val) freeze = (val == "on") end;
 	};
 }
