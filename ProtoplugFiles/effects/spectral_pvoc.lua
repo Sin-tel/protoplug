@@ -30,6 +30,7 @@ quantize = 1
 freeze = false
 normalize = 0
 warp = 0
+minval = 0
 
 -- useful constants
 local lineMax = fftSize
@@ -180,6 +181,9 @@ local function ApplyFilter(self)
 	
 	for i=0,cplxSize-1 do
 	    self.syn_mag[i] = self.syn_mag[i]*invmax
+	    if self.syn_mag[i] < minval then
+	        self.syn_mag[i] = 0
+	    end
         if quantize > 0 then
             self.syn_mag[i] = invquant*math.floor(self.syn_mag[i]*quantize)
         end
@@ -262,6 +266,14 @@ params = plugin.manageParams {
 		changed = function(val) phase_random = val*val end;
 	};
 	{
+		name = "warp";
+		min = 1;
+		max = 4;
+		type = "double";
+		default = 0;
+		changed = function(val) warp = val end;
+	};
+	{
 		name = "feedback";
 		min = 0;
 		max = 1;
@@ -293,13 +305,14 @@ params = plugin.manageParams {
 		end;
 	};
 	{
-		name = "warp";
-		min = 1;
-		max = 4;
+		name = "dropout";
+		min = 0;
+		max = 1;
 		type = "double";
-		default = 0;
-		changed = function(val) warp = val end;
+		default = 1;
+		changed = function(val) minval = val*val end;
 	};
+	
 	{
 		name = "freeze";
 		type = "list";
