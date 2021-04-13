@@ -22,6 +22,7 @@ void fftw_execute(void *plan);
 local fftSize = 4096
 local steps = 4
 
+
 -- 
 pitch = 1.0
 phase_random = 0
@@ -70,7 +71,7 @@ local function ApplyWindow (samples)
 	end
 end
 
-local function wrap(x)
+local function wrap_phase(x)
     return (x + math.pi)%(TWOPI) - math.pi 
 end
 
@@ -98,9 +99,8 @@ local function ApplyFilter(self)
 		self.syn_mag[i] = 0
 	end
 	
-	local pitch_ignore = pitch == 1.0 --math.abs(pitch - 1.0) < 0.01
+	local pitch_ignore = (pitch == 1.0)
 	
-	--local freeze = freeze or math.random() < randomstore
 	
 	-- cartesian to polar
 	if not freeze then
@@ -113,24 +113,29 @@ local function ApplyFilter(self)
             local fd = feedback
             if randomstore then
                 if feedback < math.random() then
-                    fd = 0
+                    self.mag[i] = mag
+                    self.feedb_buf[i] = self.mag[i]
+                    self.phase_delta[i] = wrap_phase(angle - self.phase[i])
+                    self.phase[i] = angle
                 else
-                    fd = 1
+                    self.mag[i] = self.feedb_buf[i]
+                    self.phase[i] =  wrap_phase(self.phase[i] + self.phase_delta[i] )
                 end
-            end
+            else
 		
-            self.mag[i] = mag*(1-fd) + self.feedb_buf[i]*fd
+                self.mag[i] = mag*(1-fd) + self.feedb_buf[i]*fd
 		
 
-            self.feedb_buf[i] = self.mag[i]
-            -- estimate instantaneous frequency
-            self.phase_delta[i] = wrap(angle - self.phase[i])
-            self.phase[i] = angle
+                self.feedb_buf[i] = self.mag[i]
+                -- estimate instantaneous frequency
+                self.phase_delta[i] = wrap_phase(angle - self.phase[i])
+                self.phase[i] = angle
+            end
         end
     else
         for i=0,cplxSize-1 do
             -- when frozen, the phase updates w estimated freq
-            self.phase[i] =  wrap(self.phase[i] + self.phase_delta[i] )
+            self.phase[i] =  wrap_phase(self.phase[i] + self.phase_delta[i] )
         end
     end
     
@@ -150,6 +155,8 @@ local function ApplyFilter(self)
     local i2 = 0
     local increment = 1/pitch
     for i=0,cplxSize-1 do
+        
+    
         local x = i / (cplxSize-1)
         -- compute polynimial warping
         x = coef[4] + x*(coef[3] +x*(coef[2] + x*coef[1]))
@@ -165,21 +172,17 @@ local function ApplyFilter(self)
                 
             local ph_a = self.phase[ind]
             local ph_b = self.phase[ind+1]
-                
-            local del_a = self.phase_delta[ind]
-            local del_b = self.phase_delta[ind+1]
-	    
 		
             self.syn_mag[i] = mag_a + (mag_b - mag_a) * frac 
-                
+            
             -- interpolate phase
             -- no attempt is made to correct for the pitch shift
-            self.syn_phase[i] = wrap(ph_a  + wrap(ph_b  - ph_a ) * frac)
+            self.syn_phase[i] = wrap_phase(ph_a  + wrap_phase(ph_b  - ph_a ) * frac)
         end
             
     end
     
-
+    
     --update mag
     local max = 0
     for i=0,cplxSize-1 do
@@ -187,8 +190,8 @@ local function ApplyFilter(self)
             max = self.syn_mag[i]
         end
     end
+    max = max + 0.00001
     local invmax = 1/max
-    
     
 	local invquant = 1 / quantize
 	
@@ -216,11 +219,12 @@ local function ApplyFilter(self)
 	-- resynthesis
 	for i=0,cplxSize-1 do
 		local mag = self.syn_mag[i]
-	
 		local phase = self.syn_phase[i]
+	
 		spectrum[i][0] = mag * math.cos(phase)
 		spectrum[i][1] = mag * math.sin(phase)
 	end
+
 end
 
 function wrap (i)
@@ -260,7 +264,11 @@ params = plugin.manageParams {
 		max = 12;
 		type = "double";
 		default = 0;
-		changed = function(val) pitch = 2^(val/12) end;
+		changed = function(val) 
+		    local c = 0.2
+		    val = val - math.max(-c,math.min(c,val))
+		    pitch = 2^(val/12) 
+		end;
 	};
 	{
 		name = "warp";
@@ -327,10 +335,10 @@ params = plugin.manageParams {
 		changed = function(val) freeze = (val == "on") end;
 	};
 		{
-		name = "random feedback";
+		name = "fdback type";
 		type = "list";
-		values = {"off"; "on"};
-		default = "off";
-		changed = function(val) randomstore = (val == "on") end;
+		values = {"normal"; "random bins"};
+		default = "normal";
+		changed = function(val) randomstore = (val == "random bins") end;
 	};
 }
