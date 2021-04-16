@@ -11,7 +11,7 @@ local Line = require "include/dsp/delay line"
 
 local kap = 0.625
 
-local max_num = 80
+local max_num = 70
 local l = max_num
 local len = 20
 local feedback = 0
@@ -24,16 +24,16 @@ function stereoFx.Channel:init ()
 	self.len = {}
 	self.filter = {}
 	for i=1,max_num do
-	    local f =  32.70320*(2^(i/12))   -- C0
+	    local f =  32.70320*(2^(i/12))
 	    
 	    -- 65.40639*(2^(i/12))
 	    -- 32.70320*(2^(i/12))
 	    
-	    local ll = math.floor(44100/f)
+	    local ll = (44100/f)
 	    
 	    print(i,ll)
 	    
-	    self.ap[i] = Line(ll+5)
+	    self.ap[i] = Line(math.floor(ll+5))
 	    
 	    self.filter[i] = 0
 	    

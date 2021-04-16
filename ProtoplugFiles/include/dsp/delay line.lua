@@ -3,10 +3,11 @@ delay line 1
 with dc filter and shitty linear interpolation
 ]]
 
+
 local function blend(a,b,p) return (a*p + b*(1-p)) end
 
 function Line (bufSize)
-	local buf = ffi.new("double[?]", bufSize)
+	local buf = ffi.new("double[?]", math.floor(bufSize+1))
 
 	local pos = 0 -- todo int
 	local dc1, dc2 = 0, 0
