@@ -1,8 +1,7 @@
--- delay line 1
--- with dc filter and shitty linear interpolation
-
--- todo test full float version
--- and possibly pointer arithmetic version
+--[[
+delay line 1
+with dc filter and shitty linear interpolation
+]]
 
 local function blend(a,b,p) return (a*p + b*(1-p)) end
 
