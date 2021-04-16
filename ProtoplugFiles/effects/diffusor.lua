@@ -5,7 +5,6 @@ local Line = require "include/dsp/delay line"
 local kap = 0.625
 local l = 100
 local len = 20
-local last = 0
 local feedback = 0
 
 stereoFx.init ()
@@ -18,6 +17,7 @@ function stereoFx.Channel:init ()
 	    self.len[i] = math.random(300)+110
 	end
 	--self.ap1 = Line(2000)
+	self.last = 0
 end
 
 function stereoFx.Channel:processBlock (samples, smax)
@@ -30,7 +30,7 @@ function stereoFx.Channel:processBlock (samples, smax)
 		--local v = input - kap * d
 		--local signal = kap*v + d
 		
-		local s = input + last*feedback
+		local s = input + self.last*feedback
 		
 		for i = 1,l do
 		    local d = self.ap[i].goBack_int(self.len[i]) 
@@ -41,7 +41,7 @@ function stereoFx.Channel:processBlock (samples, smax)
 	        self.ap[i].push(v)
 		end
 		
-		last = s
+		self.last = s
 		local signal = s
 		
 		
