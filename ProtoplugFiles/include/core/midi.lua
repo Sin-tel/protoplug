@@ -349,6 +349,21 @@ local MidiEvent_mt = {
 			if not self:isControl() then error "not a control event" end
 			return self.data[2]
 		end;
+
+		--- Is a Channel Pressure event.
+		-- @treturn boolean whether event is a channel pressure change.
+		-- @function Event:isControl
+		isPressure = function (self)
+			return band(self.data[0], 0xf0)==0xd0
+		end;
+	
+		--- Get pressure value.
+		-- @return pressure value (0-127).
+		-- @function Event:getPressure
+		getPressure = function (self)
+			if not self:isPressure() then error "not a pressure event" end
+			return self.data[1]
+		end;
 		
 		debug = function (self)
 			print (tonumber(self.time).." "..
