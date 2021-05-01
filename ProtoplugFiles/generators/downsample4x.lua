@@ -1,9 +1,13 @@
 require "include/protoplug"
+local bit = require("bit")
+local downsampler = require("include/dsp/downsampler")
+
+
 
 local attack = 0.005
 local release = 0.005
 
-local oversample = 2
+local oversample = 4
 local samplerate = 44100*oversample
 
 polyGen.initTracks(8)
@@ -11,40 +15,6 @@ polyGen.initTracks(8)
 pedal = false
 
 local TWOPI = 2*math.pi
-
-
-local FILTER_TAP_NUM = 31
-
-local filter_taps_ = {
-  -3.15622016e-04,  0.00000000e+00,  1.76790330e-03,  0.00000000e+00,
- -5.20927712e-03,  0.00000000e+00,  1.19903110e-02,  0.00000000e+00,
- -2.42536137e-02,  0.00000000e+00,  4.65939093e-02,  0.00000000e+00,
- -9.50049102e-02,  0.00000000e+00,  3.14457346e-01,  5.00000000e-01,
-  3.14457346e-01,  0.00000000e+00, -9.50049102e-02,  0.00000000e+00,
-  4.65939093e-02,  0.00000000e+00, -2.42536137e-02,  0.00000000e+00,
-  1.19903110e-02,  0.00000000e+00, -5.20927712e-03,  0.00000000e+00,
-  1.76790330e-03,  0.00000000e+00, -3.15622016e-04}
-
-local filter_taps = ffi.new("double[?]", FILTER_TAP_NUM)
-
-for i = 0,FILTER_TAP_NUM-1 do
-    filter_taps[i] = filter_taps_[i+1]
-end
-
-
-
-local function computefilter(line, ind)
-    local s = 0
-    for i = 0,FILTER_TAP_NUM-1  do
-        local j = ind + i
-        if j >= FILTER_TAP_NUM then
-            j = j - FILTER_TAP_NUM
-        end
-        s = s + filter_taps[i] * line[j]
-    end
-    return s
-    --return line[ind]
-end
 
 function newChannel()
     new = {}
@@ -72,14 +42,8 @@ function polyGen.VTrack:init()
 	
 	self.phase = 0
 	
-	self.filterline = ffi.new("double[?]", FILTER_TAP_NUM)
-	
-	for i = 0,FILTER_TAP_NUM-1 do
-	    self.filterline[i] = 0
-	end
-  
-    
-    self.find = 0
+	self.dsampler = downsampler()
+    self.dsampler2 = downsampler()
 end
 
 function processMidi(msg)
@@ -110,11 +74,11 @@ end
 function polyGen.VTrack:addProcessBlock(samples, smax)
     local ch = channels[self.channel]
     
-    local i2 = 0
-    local i3 = 0
+    --print(smax)
+    local smax_ov = (smax+1)*oversample-1
     
     if ch then
-        for i = 0,smax*oversample do
+        for i = 0,smax_ov do
             local a = attack
             if self.pres_ > ch.pressure then
                 a = release
@@ -131,27 +95,35 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
             self.phase = self.phase + self.f
             
             local out = self.phase - math.floor(self.phase) - 0.5
+            --local out = math.sin(self.phase*TWOPI)
             
             local samp = out*self.pres_
             
-            self.filterline[self.find] = samp
             
-            i2 = i2 + 1
-            if i2 >= oversample then
-                i2 = 0
+            self.dsampler.push(samp)
+            
+            if bit.band(i,1) == 0 then
                 
-                local samp2 = computefilter(self.filterline,self.find)
+                local samp2 =  self.dsampler.compute()
+
+
+                self.dsampler2.push(samp2)
                 
-                samples[0][i3] = samples[0][i3] + samp2*0.1 -- left
-                samples[1][i3] = samples[1][i3] + samp2*0.1 -- right
                 
-                i3 = i3 + 1
+                
+                if bit.band(i,2) == 0 then
+                    local samp3 = self.dsampler2.compute()
+                    
+                    local i2 = bit.rshift(i, 2)
+                
+                    samples[0][i2] = samples[0][i2] + samp3*0.1 -- left
+                    samples[1][i2] = samples[1][i2] + samp3*0.1 -- right
+                end
+                
+                
             end
             
-		    self.find = self.find + 1
-            if self.find >= FILTER_TAP_NUM then
-                self.find = 0
-            end
+		    
         end
         
         --[[if self.pres_ < 0.001 and ch.noteOff then
