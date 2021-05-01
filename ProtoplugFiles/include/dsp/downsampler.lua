@@ -1,44 +1,39 @@
 --[[
-FIR downsampler
+FIR 2x downsampler
 kaiser window, beta = 6
+
+optimized version
 ]]
 
-local FILTER_TAP_NUM = 31
+local bit = require("bit")
 
-local CENTER = 15
-
-local filter_taps = ffi.new("double[?]", FILTER_TAP_NUM,{ [0] =
-  -3.15622016e-04,  0.00000000e+00,  1.76790330e-03,  0.00000000e+00,
- -5.20927712e-03,  0.00000000e+00,  1.19903110e-02,  0.00000000e+00,
- -2.42536137e-02,  0.00000000e+00,  4.65939093e-02,  0.00000000e+00,
- -9.50049102e-02,  0.00000000e+00,  3.14457346e-01,  5.00000000e-01,
-  3.14457346e-01,  0.00000000e+00, -9.50049102e-02,  0.00000000e+00,
-  4.65939093e-02,  0.00000000e+00, -2.42536137e-02,  0.00000000e+00,
-  1.19903110e-02,  0.00000000e+00, -5.20927712e-03,  0.00000000e+00,
-  1.76790330e-03,  0.00000000e+00, -3.15622016e-04}) 
+local band = bit.band
 
 function Downsampler ()
-	local buf = ffi.new("double[?]", FILTER_TAP_NUM)
+	local buf = ffi.new("double[?]", 32)
 
 	local pos = 0
 	
 	return {
 		compute = function ()
 		    local s = 0
-		    for i = 0,FILTER_TAP_NUM-1,2  do
-		        local j = (pos + i)%FILTER_TAP_NUM
+	        s = s - 3.15622016e-04 * (buf[pos]                + buf[band(pos - 30, 31)])
+	        s = s + 1.76790330e-03 * (buf[band(pos -  2, 31)] + buf[band(pos - 28, 31)])
+	        s = s - 5.20927712e-03 * (buf[band(pos -  4, 31)] + buf[band(pos - 26, 31)])
+	        s = s + 1.19903110e-02 * (buf[band(pos -  6, 31)] + buf[band(pos - 24, 31)])
+	        s = s - 2.42536137e-02 * (buf[band(pos -  8, 31)] + buf[band(pos - 22, 31)])
+	        s = s + 4.65939093e-02 * (buf[band(pos - 10, 31)] + buf[band(pos - 20, 31)])
+	        s = s - 9.50049102e-02 * (buf[band(pos - 12, 31)] + buf[band(pos - 18, 31)])
+	        s = s + 3.14457346e-01 * (buf[band(pos - 14, 31)] + buf[band(pos - 16, 31)])
+
+	        s = s + 0.5 * buf[band(pos - 15,31)]
 		    
-		        s = s + filter_taps[i] * buf[j]
-		    end
-		    
-		    local c = (pos + CENTER)%FILTER_TAP_NUM
-		    
-		    return s + buf[c]*0.5
+		    return s
 
 		end;
 		
 		push = function (samp)
-			pos = (pos + 1)%FILTER_TAP_NUM
+			pos = band(pos + 1,31)
             buf[pos] = samp
 		end;
 	}
