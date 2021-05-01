@@ -3,13 +3,14 @@ local bit = require("bit")
 local downsampler = require("include/dsp/downsampler")
 
 
+
 local attack = 0.005
 local release = 0.005
 
 local oversample = 2
 local samplerate = 44100*oversample
 
-polyGen.initTracks(8)
+polyGen.initTracks(15)
 
 pedal = false
 
@@ -42,7 +43,6 @@ function polyGen.VTrack:init()
 	self.phase = 0
 	
 	self.dsampler = downsampler()
-	
 end
 
 function processMidi(msg)
@@ -70,54 +70,44 @@ function processMidi(msg)
     end
 end
 
+function polyGen.VTrack:tick()
+    local ch = channels[self.channel]
+    local a = attack
+    if self.pres_ > ch.pressure then
+        a = release
+    end
+    self.pres_ = self.pres_ - (self.pres_ - ch.pressure)*a
+            
+            
+    local pt = ch.pitch + ch.pitchbend
+            
+    self.pitch = self.pitch - (self.pitch - pt)*0.002 
+            
+    self.f = getFreq(self.pitch)
+            
+    self.phase = self.phase + self.f
+            
+    local out = self.phase - math.floor(self.phase) - 0.5
+    --local out = math.sin(self.phase*TWOPI)
+            
+    return out*self.pres_
+end
+
 function polyGen.VTrack:addProcessBlock(samples, smax)
     local ch = channels[self.channel]
     
-    --print(smax)
-    local smax_ov = (smax+1)*oversample-1
-    
     if ch then
-        for i = 0,smax_ov do
-            local a = attack
-            if self.pres_ > ch.pressure then
-                a = release
-            end
-            self.pres_ = self.pres_ - (self.pres_ - ch.pressure)*a
+        for i = 0,smax do
+          
+            local u =  self.dsampler.tick(self:tick(),self:tick())
             
-            
-            local pt = ch.pitch + ch.pitchbend
-            
-            self.pitch = self.pitch - (self.pitch - pt)*0.002 
-            
-            self.f = getFreq(self.pitch)
-            
-            self.phase = self.phase + self.f
-            
-            local out = self.phase - math.floor(self.phase) - 0.5
-            --local out = math.sin(self.phase*TWOPI)
-            
-            local samp = out*self.pres_
-            
-            self.dsampler.push(samp)
-
-            
-            if bit.band(i,1) == 0 then
-                
-                local samp2 =  self.dsampler.compute()
-                
-                local i2 = bit.arshift(i, 1)
-                
-                samples[0][i2] = samples[0][i2] + samp2*0.1 -- left
-                samples[1][i2] = samples[1][i2] + samp2*0.1 -- right
-                
-            end
-            
-		    
+            samples[0][i] = samples[0][i] + u*0.1 -- left
+            samples[1][i] = samples[1][i] + u*0.1 -- right
         end
         
-        if self.pres_ < 0.001 and ch.noteOff then
+        --[[if self.pres_ < 0.001 and ch.noteOff then
             self.channel = 0
-        end
+        end]]
      end
 end
 

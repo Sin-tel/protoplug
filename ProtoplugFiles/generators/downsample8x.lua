@@ -7,7 +7,7 @@ local downsampler = require("include/dsp/downsampler")
 local attack = 0.005
 local release = 0.005
 
-local oversample = 4
+local oversample = 8
 local samplerate = 44100*oversample
 
 polyGen.initTracks(15)
@@ -44,6 +44,7 @@ function polyGen.VTrack:init()
 	
 	self.dsampler = downsampler()
     self.dsampler2 = downsampler()
+    self.dsampler3 = downsampler()
 end
 
 function processMidi(msg)
@@ -100,9 +101,13 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
     if ch then
         for i = 0,smax do
           
-            local u = self.dsampler2.tick(
+            local u = self.dsampler3.tick(
+            self.dsampler2.tick(
                 self.dsampler.tick(self:tick(),self:tick()),
-                self.dsampler.tick(self:tick(),self:tick()))
+                self.dsampler.tick(self:tick(),self:tick())),
+            self.dsampler2.tick(
+                self.dsampler.tick(self:tick(),self:tick()),
+                self.dsampler.tick(self:tick(),self:tick())))
             
             samples[0][i] = samples[0][i] + u*0.1 -- left
             samples[1][i] = samples[1][i] + u*0.1 -- right

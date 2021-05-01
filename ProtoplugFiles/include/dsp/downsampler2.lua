@@ -23,8 +23,14 @@ function Downsampler ()
 	local pos = 0
 	
 	return {
-		compute = function ()
-		    local s = 0
+		tick = function (s1, s2)
+			pos = (pos + 1)%FILTER_TAP_NUM
+            buf[pos] = s1
+
+            pos = (pos + 1)%FILTER_TAP_NUM
+            buf[pos] = s2
+
+            local s = 0
 		    for i = 0,FILTER_TAP_NUM-1,2  do
 		        local j = (pos + i)%FILTER_TAP_NUM
 		    
@@ -34,12 +40,6 @@ function Downsampler ()
 		    local c = (pos + CENTER)%FILTER_TAP_NUM
 		    
 		    return s + buf[c]*0.5
-
-		end;
-		
-		push = function (samp)
-			pos = (pos + 1)%FILTER_TAP_NUM
-            buf[pos] = samp
 		end;
 	}
 end
