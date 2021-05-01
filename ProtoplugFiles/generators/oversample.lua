@@ -3,12 +3,48 @@ require "include/protoplug"
 local attack = 0.005
 local release = 0.005
 
-polyGen.initTracks(1)
+local oversample = 2
+local samplerate = 44100*oversample
+
+polyGen.initTracks(8)
 
 pedal = false
 
 local TWOPI = 2*math.pi
-local freq = 6*TWOPI/44100
+
+
+local FILTER_TAP_NUM = 31
+
+local filter_taps_ = {
+  -3.15622016e-04,  0.00000000e+00,  1.76790330e-03,  0.00000000e+00,
+ -5.20927712e-03,  0.00000000e+00,  1.19903110e-02,  0.00000000e+00,
+ -2.42536137e-02,  0.00000000e+00,  4.65939093e-02,  0.00000000e+00,
+ -9.50049102e-02,  0.00000000e+00,  3.14457346e-01,  5.00000000e-01,
+  3.14457346e-01,  0.00000000e+00, -9.50049102e-02,  0.00000000e+00,
+  4.65939093e-02,  0.00000000e+00, -2.42536137e-02,  0.00000000e+00,
+  1.19903110e-02,  0.00000000e+00, -5.20927712e-03,  0.00000000e+00,
+  1.76790330e-03,  0.00000000e+00, -3.15622016e-04}
+
+local filter_taps = ffi.new("double[?]", FILTER_TAP_NUM)
+
+for i = 0,FILTER_TAP_NUM-1 do
+    filter_taps[i] = filter_taps_[i+1]
+end
+
+
+
+local function computefilter(line, ind)
+    local s = 0
+    for i = 0,FILTER_TAP_NUM-1  do
+        local j = ind + i
+        if j >= FILTER_TAP_NUM then
+            j = j - FILTER_TAP_NUM
+        end
+        s = s + filter_taps[i] * line[j]
+    end
+    return s
+    --return line[ind]
+end
 
 function newChannel()
     new = {}
@@ -31,18 +67,19 @@ function polyGen.VTrack:init()
 	self.channel = 0
 	
 	self.pitch = 0
-	
 	self.f = 0
 	self.pres_ = 0
 	
-	self.noise = 0
-	self.noise2 = 0
 	self.phase = 0
 	
-	self.fdbck = 0
+	self.filterline = ffi.new("double[?]", FILTER_TAP_NUM)
 	
-	self.fv = 0
-	
+	for i = 0,FILTER_TAP_NUM-1 do
+	    self.filterline[i] = 0
+	end
+  
+    
+    self.find = 0
 end
 
 function processMidi(msg)
@@ -56,10 +93,9 @@ function processMidi(msg)
             
             local chn = channels[ch]
             chn.pitchbend = pitchbend
-            --setPitch(chn)
+
         end
     elseif msg:isControl() then
-        --print(msg:getControlNumber())
     
         if msg:getControlNumber() == 64 then
             pedal = msg:getControlValue() ~= 0
@@ -74,42 +110,53 @@ end
 function polyGen.VTrack:addProcessBlock(samples, smax)
     local ch = channels[self.channel]
     
-    if ch then
+    local i2 = 0
+    local i3 = 0
     
-        local maxpres = 0
-        
-        for i =1,16 do
-            local p = channels[i].pressure
-            if p > maxpres then
-                maxpres = p
-                
-            end    
-        end
-        
-        for i = 0,smax do
-        
+    if ch then
+        for i = 0,smax*oversample do
             local a = attack
             if self.pres_ > ch.pressure then
                 a = release
             end
-            self.pres_ = self.pres_ - (self.pres_ - maxpres)*a
+            self.pres_ = self.pres_ - (self.pres_ - ch.pressure)*a
+            
             
             local pt = ch.pitch + ch.pitchbend
             
             self.pitch = self.pitch - (self.pitch - pt)*0.002 
             
-            self.f = getFreq(self.pitch)*TWOPI
-           
+            self.f = getFreq(self.pitch)
             
             self.phase = self.phase + self.f
             
-            local out = math.sin(self.phase) 
+            local out = self.phase - math.floor(self.phase) - 0.5
             
             local samp = out*self.pres_
-		
-            samples[0][i] = samples[0][i] + samp*0.5 -- left
-            samples[1][i] = samples[1][i] + samp*0.5 -- right
+            
+            self.filterline[self.find] = samp
+            
+            i2 = i2 + 1
+            if i2 >= oversample then
+                i2 = 0
+                
+                local samp2 = computefilter(self.filterline,self.find)
+                
+                samples[0][i3] = samples[0][i3] + samp2*0.1 -- left
+                samples[1][i3] = samples[1][i3] + samp2*0.1 -- right
+                
+                i3 = i3 + 1
+            end
+            
+		    self.find = self.find + 1
+            if self.find >= FILTER_TAP_NUM then
+                self.find = 0
+            end
         end
+        
+        --[[if self.pres_ < 0.001 and ch.noteOff then
+            self.channel = 0
+        end]]
      end
 end
 
@@ -118,26 +165,7 @@ function polyGen.VTrack:noteOff(note, ev)
     local ch = channels[i]
     print(i, "off")
     ch.pressure = 0
-    
-    local maxpres = 0
-    local maxi = 0
-        
-    for j =1,16 do
-        local p = channels[j].pressure
-        if p > maxpres then
-            maxpres = p
-            maxi = j
-                
-        end    
-    end
-    
-    if maxpres > 0.01 then
-        self.channel = maxi
-        
-        self.pitch = channels[maxi].pitch + channels[maxi].pitchbend
-        
-        print(self.channel, "active")
-    end
+    ch.noteOff = true
 end
 
 function polyGen.VTrack:noteOn(note, vel, ev)
@@ -160,20 +188,19 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     
     local ch = channels[i]
     
+    ch.noteOff = false
+    
     ch.pitch = note
     
     ch.pressure = 0
     
-    --setPitch(ch)
     self.pitch = ch.pitch + ch.pitchbend
-    
-   -- self.pres_ = 0
 end
 
 
 function getFreq(note)
 	local f = 440 * 2^((note - 69)/12)
-	return f/44100
+	return f/samplerate
 end
 
 
