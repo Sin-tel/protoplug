@@ -53,6 +53,12 @@ function polyGen.VTrack:init()
 	
 end
 
+local function curve(x)
+    local g = 1-x
+    return 1-g*g
+end
+
+
 function processMidi(msg)
     --print(msg:debug())
     local ch = msg:getChannel()
@@ -74,10 +80,11 @@ function processMidi(msg)
         end
     elseif msg:isPressure() then
         if ch > 1 then
-            channels[ch].pressure = msg:getPressure()/127
+            channels[ch].pressure = curve(msg:getPressure()/127)
         end
     end
 end
+
 
 function polyGen.VTrack:addProcessBlock(samples, smax)
     local ch = channels[self.channel]

@@ -9,7 +9,7 @@ local decayRate =  1 - 1/decay
 local sustain = 0.2
 
 fifth = 6.956 --fifth in semitones
-fifth = 3.86  --third in semitones
+third = 3.86  --third in semitones
 notes = {}
 
 
