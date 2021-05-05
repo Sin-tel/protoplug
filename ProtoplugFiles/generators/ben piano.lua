@@ -8,6 +8,7 @@ The scale is automatically shifted so that the root is the lowest note currently
 ]]
 
 
+
 require "include/protoplug"
 
 local release = 1*44100
