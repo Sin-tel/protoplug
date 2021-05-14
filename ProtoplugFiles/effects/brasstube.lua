@@ -1,3 +1,5 @@
+-- brass tube with variable speed of sound due to pressure
+
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 

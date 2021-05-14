@@ -1,3 +1,6 @@
+-- more realistic version
+
+
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 

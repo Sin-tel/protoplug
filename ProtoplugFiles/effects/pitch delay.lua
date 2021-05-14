@@ -2,11 +2,6 @@ require "include/protoplug"
 FLine = require "include/dsp/fdelay_line"
 local cbFilter = require "include/dsp/cookbook filters"
 
-
-
-
---Welcome to Lua Protoplug effect (version 1.4.0)
-
 local maxLength = 3*44100
 local fadeSpeed = 20/44100
 

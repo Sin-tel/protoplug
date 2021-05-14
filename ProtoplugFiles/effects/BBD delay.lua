@@ -1,3 +1,9 @@
+--[[
+bucket brigade delay
+the bbd itself runs at a variable (noninteger) samplerate 
+with a simple lowpass to do a bit of antialiasing
+]]
+
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 FLine = require "include/dsp/fdelay_line"

@@ -1,8 +1,6 @@
 --[[
-name: Badass Distortion
-description: The one from the website
-author: osar.fr
---]]
+lower bit resolution with mu law companding
+]]
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 

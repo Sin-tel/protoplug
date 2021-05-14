@@ -1,3 +1,8 @@
+--[[
+audio signal that modulates itself
+terrible effect to be honest
+]]
+
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 FLine = require "include/dsp/fdelay_line"

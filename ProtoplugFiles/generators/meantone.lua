@@ -1,3 +1,9 @@
+--[[
+detempers input midi to meantone
+ie "unrolls" the circle of fifths
+
+]]
+
  require "include/protoplug"
 
 local release = 0.12*44100

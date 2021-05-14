@@ -1,3 +1,8 @@
+--[[
+lofi  delay
+
+]]
+
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 FLine = require "include/dsp/fdelay_line"

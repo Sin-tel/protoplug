@@ -1,3 +1,9 @@
+--[[
+physical model of an electric piano pickup
+
+]]
+
+
  require "include/protoplug"
 
 local release = 0.03*44100

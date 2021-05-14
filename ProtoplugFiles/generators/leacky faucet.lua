@@ -1,7 +1,6 @@
 --[[
-name: sine organ
-description: A simple organ-like sinewave VST/AU. 
-author: osar.fr
+chaos in a leaking faucet
+time between drips is modeled with a logistic map
 --]]
 
 require "include/protoplug"

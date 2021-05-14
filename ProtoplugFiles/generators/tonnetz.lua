@@ -1,3 +1,8 @@
+--[[
+synth that detempers 12edo input notes to 5limit just intonation
+
+]]
+
   require "include/protoplug"
 
 local release = 0.12*44100

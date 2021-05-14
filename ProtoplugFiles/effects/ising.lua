@@ -1,3 +1,9 @@
+--[[
+ising model
+stochastic model of spin in a magnetic pickup
+too much quantum noise to be useful
+]]
+
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 

@@ -1,3 +1,9 @@
+--[[
+midi version 
+remaps 12 edo input to another edo
+
+]]
+
  require "include/protoplug"
 
 

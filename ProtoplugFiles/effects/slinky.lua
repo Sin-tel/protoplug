@@ -1,6 +1,10 @@
+--[[
+simulate slinky delay with characteristic frequency sweep
+]]
+
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
-local Line = require "include/dsp/delay line"
+local Line = require "include/dsp/delay_line"
 
 local kap = 0.625
 local l = 100

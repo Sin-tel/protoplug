@@ -1,7 +1,5 @@
 --[[
-name: sine organ
-description: A simple organ-like sinewave VST/AU. 
-author: osar.fr
+chaotic van der pol oscillators
 --]]
 
 require "include/protoplug"

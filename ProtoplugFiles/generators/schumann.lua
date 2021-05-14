@@ -1,7 +1,6 @@
 --[[
-name: sine organ
-description: A simple organ-like sinewave VST/AU. 
-author: osar.fr
+simulated schumann resonances of the atmosphere 
+
 --]]
 
 require "include/protoplug"

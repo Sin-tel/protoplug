@@ -1,7 +1,6 @@
 --[[
-name: Badass Distortion
-description: The one from the website
-author: osar.fr
+even and odd polynomial distortion
+
 --]]
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"

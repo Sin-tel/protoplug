@@ -1,8 +1,7 @@
 --[[
-name: Badass Distortion  
-description: The one from the website
-author: osar.fr
---]]
+terrible distortion 
+sounds pretty good
+]]
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 
@@ -15,9 +14,8 @@ local c = 0
 stereoFx.init ()
 function stereoFx.Channel:init ()
     self.s = 0
-	-- create per-channel fields (filters)
 	
-	self.high = cbFilter {type = "hp"; f = 20; gain = 0; Q = 0.3}
+	self.high = cbFilter {type = "hp"; f = 50; gain = 0; Q = 0.7}
 end
 
 function stereoFx.Channel:processBlock (samples, smax)

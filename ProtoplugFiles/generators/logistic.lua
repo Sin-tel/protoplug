@@ -1,7 +1,6 @@
 --[[
-name: sine organ
-description: A simple organ-like sinewave VST/AU. 
-author: osar.fr
+iterated logistic map
+can be used as a noise source
 --]]
 
 require "include/protoplug"

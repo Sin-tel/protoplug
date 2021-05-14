@@ -1,3 +1,9 @@
+--[[
+midi version
+output edo must support meantone (in the wide sense: superpyth and mavila also work)
+
+]]
+
  require "include/protoplug"
 
 
