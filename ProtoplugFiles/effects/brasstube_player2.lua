@@ -1,34 +1,44 @@
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 
+local lp2filters = {}
+
+
 
 local len = 500
 
-local beta = 0.05
+local beta = 0.03
 
-local pressure = 0.6
+local time = 0
+
+local pressure = 0
 
 
 local line = {}
-
-for i = 1,len*2 do
+for i = 1,len do
     line[i] = 0
 end
-
 local line2 = {}
-
-for i = 1,len*2 do
-    line2[i] = 0
+for i = 1,len do
+    line[i] = 0
 end
 	
 local high = cbFilter {type = "hp"; f = 20; gain = 0; Q = 0.7}
+
+local lip = cbFilter
+	{
+		type 	= "lp";
+		f 		= 12000;
+		gain 	= 0;
+		Q 		= 10.0;
+	}
 	
 local lp2 = cbFilter
 	{
-		type 	= "bp";
+		type 	= "lp";
 		f 		= 12000;
 		gain 	= 0;
-		Q 		= 5.0;
+		Q 		= 0.707;
 	}
 	
 
@@ -36,21 +46,32 @@ local lp2 = cbFilter
 
 function plugin.processBlock (samples, smax)
     for i = 0, smax do
-	    
+	    time = time + 1/44100
 	
-	    local input = samples[0][i]
 	    
-	    local feedback = high.process(line[len*2-1])
-	    feedback = feedback*0.68 --lp2.process(feedback)*0.95
+	    local feedback = line[len-1]*0.85--high.process(line[len-1])
 	    
-	    local s = input + feedback + lp2.process(feedback)*pressure
-	    s = math.max(math.min(s,1),-1)
+	    --feedback = lp2.process(feedback)*0.85
+	    local pressure = pressure 
+	    
+	    local deltaP = pressure - feedback
+	    deltaP = lip.process(deltaP)
+	    deltaP = deltaP*math.max(0,deltaP)
+	    deltaP =  deltaP * (1.0 + 0.2*math.random())
+	    if deltaP > 1.0 then
+	        deltaP = 1.0
+	    end
+	    
+	    
+	    
+	    local s = deltaP * pressure + (1.0 - deltaP) * feedback
+	    s  = high.process(s)
+	    --s = math.max(math.min(s,1),0)
 	    
 	    line2[1] = s
-	    
 	    line[0] = s
-	    for i = 2,len do
-	        local sum = line[i-1] + line[len*2-i]
+	    for i = 2,len*0.5 do
+	        local sum = line[i-1] + line[len-i]
 	        
 	        local e = beta*(0.5+0.25*sum)
 	        
@@ -60,14 +81,14 @@ function plugin.processBlock (samples, smax)
            line2[i] = (1-e)*line[i-1] + e*line[i-2]
            --line2[i] = line[i-1]
            
-           line2[len*2-i+1] = (1-e)*line[len*2-i] + e*line[len*2-i-1]
+           line2[len-i+1] = (1-e)*line[len-i] + e*line[len-i-1]
         end
         
         --swap buffers
         line, line2 = line2, line
 	    
 	    
-		local signal = line[math.floor(len*2-1)]
+		local signal = line[math.floor(len/2)]
 		
 		
 		
@@ -78,18 +99,24 @@ end
 
 
 params = plugin.manageParams {
-
-	{
-		name = "Cutoff";
-		min = 0;
-		max = 10;
-		changed = function(val) lp2.update({f=22000*math.exp(val-10)}); end;
-	};
-	{
-		name = "pressure";
+    {
+		name = "Pressure";
 		min = 0;
 		max = 1;
 		changed = function(val) pressure = val; end;
+	};
+
+	{
+		name = "Lip Freq";
+		min = 0;
+		max = 16;
+		changed = function(val) lip.update({f=(44100/(len+10))*val}); end;
+	};
+	{
+		name = "Lip Q";
+		min = 1;
+		max = 50;
+		changed = function(val) lip.update({Q=val}); end;
 	};
 	
 }

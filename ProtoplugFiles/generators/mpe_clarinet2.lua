@@ -1,5 +1,5 @@
 --[[
-model of a clarinet that actually sounds like a flute
+ ok this one actually sounds like a clarinet
 ]]
 
 require "include/protoplug"
@@ -13,6 +13,7 @@ local release = 0.005
 local kappa = 0
 local split = 0.8
 local mod = 0
+local register = 0
 
 local tun_m = 1
 local tun_o = 0
@@ -23,7 +24,7 @@ pedal = false
 
 TWOPI = 2*math.pi
 
-local freq = 35*TWOPI/44100
+local freq = 4.5*TWOPI/44100
 
 
 
@@ -61,27 +62,38 @@ function polyGen.VTrack:init()
 	
 	self.fv = 0
 	
-	self.delayL = {}
-	self.delayL[1] = Line(512)
-	self.delayL[2] = Line(512)
+	self.delayline = Line(1024)
 	
-	
-	self.delayR = {}
-	self.delayR[1] = Line(512)
-	self.delayR[2] = Line(512)
+	self.reg = 0
+	self.reg2 = 0
+
 	
 	self.lp = cbFilter
 	{
-		-- initialize filters with current param values
 		type 	= "lp";
-		f 		= 4000;
+		f 		= 7000;
 		gain 	= 0;
 		Q 		= 0.7;
 	}
 	
+	self.lp2 = cbFilter
+	{
+		type 	= "lp";
+		f 		= 2000;
+		gain 	= 0;
+		Q 		= 0.7;
+	}
+	
+	self.reedfilter = cbFilter
+	{
+		type 	= "lp";
+		f 		= 900;
+		gain 	= 0;
+		Q 		= 0.9;
+	}
+	
 	self.dcblock = cbFilter
 	{
-		-- initialize filters with current param values
 		type 	= "hp";
 		f 		= 50;
 		gain 	= 0;
@@ -91,7 +103,7 @@ function polyGen.VTrack:init()
 	{
 		-- initialize filters with current param values
 		type 	= "bp";
-		f 		= 500;
+		f 		= 900;
 		gain 	= 0;
 		Q 		= 1.0;
 	}
@@ -130,6 +142,12 @@ function processMidi(msg)
     end
 end
 
+--function sign ( val ) return math.max ( math.min ( val * math.huge, 1 ), -1 ) end
+
+function sign(n)
+	return n < 0 and -1 or n > 0 and 1 or 0
+end
+
 function polyGen.VTrack:addProcessBlock(samples, smax)
     local ch = channels[self.channel]
     
@@ -154,78 +172,77 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
             end
             self.pres_ = self.pres_ - (self.pres_ - ch.pressure)*a
             
-            --self.f_ = self.f_ - (self.f_ - ch.f)*0.002 
+            self.f_ = self.f_ - (self.f_ - ch.f)*0.0002 
             
             
             
-            local fa = ch.f - self.f_
+            --[[local fa = ch.f - self.f_
             self.fv = self.fv + freq*(fa - 0.4*self.fv)
             self.fv = math.tanh(self.fv*0.7/self.f_)*(self.f_/0.7)
-            self.f_ = self.f_ + freq*self.fv
+            self.f_ = self.f_ + freq*self.fv]]
             
             self.phase = self.phase + freq 
-            --self.phase = self.phase + (0.1*self.f_ * TWOPI)
+            --self.phase = self.phase + (0.68*self.f_ * TWOPI)
             
             
             local nse = math.random()-0.5
             nse = self.noisefilter.process(nse)
             
-            local len = 1/(4*self.f_*tun_m) + tun_o
+            local len = 1/(self.f_*tun_m) + tun_o
             
-            local spp = split * (1.0 - mod*self.pres_)
+            local len2 = 1/(3.2*self.f_*tun_m) + tun_o
             
-            local l1 = spp*len
-            local l2 = (1-spp)*len
+            local b1 = self.delayline.goBack(len)
             
-            --[[local spl2 = math.min(10, len*0.5)
+            b1 = self.lp.process(b1)
             
-            local l1 = len - spl2
-            local l2 = spl2]]
+            local b2 = self.delayline.goBack(len2)
+            
+            b2 = self.lp2.process(b2)
+            
+            local r = self.reg*register
+            
+            local boreOut = (1.0 - r)*b1 + r*b2
+            
+            
+            local boreOut = -0.85*boreOut
             
             
             
-            local boreOut = self.delayL[1].goBack(l1)
-            
-            
-            --boreOut = self.lp.process(boreOut)
             
         
-            local pressure = (1.0 + 0.3*nse + ch.slide*0.5*math.sin(self.phase))*self.pres_
+            local pressure = (1.0 + 0.2*nse + ch.slide*0.4*math.sin(self.phase))*self.pres_ --+ ch.slide*0.5*math.sin(self.phase)
             
             
-            local presdiff = boreOut - pressure  
-            local refl = -1.6*presdiff + 0.2
-            refl = math.tanh(refl)
+            local presdiff = pressure - boreOut
             
-            
-            
-            local bell = -0.95*self.delayR[2].goBack(l2)
-            
-            local scr = self.delayR[1].goBack(l1)
-            local scl = self.delayL[2].goBack(l2)
-            
-            
-            local w = kappa*(scr - scl)
-            
-            
-            self.delayR[1].push(pressure + presdiff*refl)
-            --self.delayR[1].push(pressure + boreOut)
-            self.delayL[1].push(scl + w)
-            
-            self.delayR[2].push(scr + w)
-            self.delayL[2].push(bell)
+            local reedx = (1 - presdiff)
+            reedx = self.reedfilter.process(reedx)
+            reedx = math.min(1,math.max(0,reedx))
             
             
             
-            local out = self.dcblock.process(bell)
+            --local flow = reedx*sign(presdiff)*math.sqrt(math.abs(presdiff))
+            local flow = reedx*math.tanh(1.7*presdiff)
+            
+            flow = flow --* (1.0 + 0.8*nse)
+            
+            
+            
+            
+            self.delayline.push(boreOut + flow)
+
+            
+            
+            local out = self.dcblock.process(boreOut)
             
            
 		
             
             local samp = out
 		
-            samples[0][i] = samples[0][i] + samp*0.5 -- left
-            samples[1][i] = samples[1][i] + samp*0.5 -- right
+            samples[0][i] = samples[0][i] + samp*0.25 -- left
+            samples[1][i] = samples[1][i] + samp*0.25 -- right
         end
         
      end
@@ -234,7 +251,7 @@ end
 function polyGen.VTrack:noteOff(note, ev)
 	local i = ev:getChannel()
     local ch = channels[i]
-    print(i, "off")
+    --print(i, "off")
     ch.pressure = 0
     
     local maxpres = 0
@@ -260,7 +277,7 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     
     local i = ev:getChannel()
     --activech = i
-    print(i, "on")
+    --print(i, "on")
     
     local assignNew = true
     for j=1,polyGen.VTrack.numTracks do
@@ -278,12 +295,29 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     
     ch.pitch = note
     
-    ch.pressure = 0
+
+    print(note)
     
     setPitch(ch)
     self.f_ = ch.f
     
-    print(1/self.f_)
+    self.reedfilter.update({f = 900 + 44100*self.f_*4.2, Q = 0.9})
+     
+    -- 80
+    if note > 68 then
+        ch.pitch = note - 19.0195
+        setPitch(ch)
+        self.f_ = ch.f
+        self.reg = 1.0
+    else
+        self.reg = 0.0
+    end
+    
+    ch.pressure = 0
+    
+   
+    
+
     
    -- self.pres_ = 0
 end
@@ -314,38 +348,24 @@ params = plugin.manageParams {
 		changed = function(val) release = math.exp(-val) end;
 	};
 	{
-		name = "Kappa";
-		min = -1;
-		max = 1;
-		default = 0.3;
-		changed = function(val) kappa = val end;
-	};
-	{
-		name = "Split";
+		name = "Register";
 		min = 0;
 		max = 1;
-		default = 0.11;
-		changed = function(val) split = val end;
-	};
-	{
-		name = "Split mod";
-		min = 0;
-		max = 1;
-		default = 0.3;
-		changed = function(val) mod = val end;
+		default = 0.21;
+		changed = function(val) register = val end;
 	};
 	{
 		name = "Tune master";
 		min = -0.5;
 		max = 0.5;
-		default = 0.0625;
+		default = 0.01;
 		changed = function(val) tun_m = math.exp(val) end;
 	};
 	{
 		name = "Tune offset";
 		min = -10;
 		max = 10;
-		default = -2.61;
+		default = -1.6;
 		changed = function(val) tun_o = val end;
 	};
 }

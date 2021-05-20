@@ -5,9 +5,9 @@ local lp2filters = {}
 
 
 
-local len = 200
+local len = 500
 
-local beta = 0.03
+local beta = 0.05
 
 local time = 0
 
@@ -56,7 +56,7 @@ function plugin.processBlock (samples, smax)
 	    
 	    local deltaP = pressure - feedback
 	    deltaP = lip.process(deltaP)
-	    deltaP = deltaP*deltaP
+	    deltaP = deltaP*math.max(0,deltaP)
 	    deltaP =  deltaP * (1.0 + 0.02*math.random())
 	    if deltaP > 1.0 then
 	        deltaP = 1.0

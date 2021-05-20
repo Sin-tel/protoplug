@@ -60,11 +60,13 @@ function polyGen.VTrack:init()
 	self.delayLine = Line(1024)
 	self.jetDelay = Line(1024)
 	
+	self.ap = Line(100)
+	
 	self.lp = cbFilter
 	{
 		-- initialize filters with current param values
 		type 	= "lp";
-		f 		= 4000;
+		f 		= 3000;
 		gain 	= 0;
 		Q 		= 0.7;
 	}
@@ -155,24 +157,38 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
             nse = nse * self.pres_
             nse = self.noisefilter.process(nse)
             
-            local boreOut = 0.95 * self.delayLine.goBack(1/self.f_ )
+            local boreOut = 0.95 * self.delayLine.goBack(1/self.f_ -10)
             
             
             boreOut = self.lp.process(boreOut)
             
         
-            local pressure = (0.65 + 0.02*nse)*self.pres_
+            local pressure = (1.0 + 0.04*nse)*self.pres_
             
             
             local jet = pressure + boreOut
             
-            jet = math.max(-1,math.min(1,jet))
+            --jet = math.max(-1,math.min(1,jet))
+            --jet = jet - jet*jet*jet
             
-            jet = jet - jet*jet*jet
+            jet = math.tanh(jet)
+            jet = jet - 2*jet*jet*jet
+            
             
             local r = self.jetDelay.goBack(1/(self.f_*harmonic) )
             
             local boreIn = jetGain*r + boreGain*boreOut
+            
+            
+            --alpass
+            local kap = 0.5
+            local d = self.ap.goBack_int(10) 
+		    local v = boreIn - kap * d
+	        boreIn = kap*v + d
+	        
+	        
+	        self.ap.push(v)
+	        ---
             
             self.jetDelay.push(jet)
             self.delayLine.push(boreIn)

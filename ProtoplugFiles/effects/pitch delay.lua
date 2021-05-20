@@ -23,7 +23,6 @@ function stereoFx.Channel:init()
     
     self.lp = cbFilter
 	{
-		-- initialize filters with current param values
 		type 	= "lp";
 		f 		= 12000;
 		gain 	= 0;
@@ -32,7 +31,6 @@ function stereoFx.Channel:init()
 	table.insert(lpfilters, self.lp)
 	self.hp = cbFilter
 	{
-		-- initialize filters with current param values
 		type 	= "hp";
 		f 		= 350;
 		gain 	= 0;
