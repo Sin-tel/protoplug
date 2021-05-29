@@ -62,6 +62,11 @@ local function Filter(params)
 				b0, b1, b2 = params.Q*alpha, 0, -params.Q*alpha
 				a0, a1, a2 = 1 + alpha, -2*cos_w0, 1 - alpha
 
+			-- constant 0dB peak
+			elseif params.type == "bpc" then
+				b0, b1, b2 = alpha, 0, -alpha
+				a0, a1, a2 = 1 + alpha, -2*cos_w0, 1 - alpha
+
 			elseif params.type == "bs" then
 				b0, b1, b2 = 1, -2*cos_w0, 1
 				a0, a1, a2 = 1 + alpha, -2*cos_w0, 1 - alpha

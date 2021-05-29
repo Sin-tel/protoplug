@@ -263,7 +263,7 @@ params = plugin.manageParams {
 		default = 5;
 		changed = function(val) attack = math.exp(-val) end;
 	};
-		{
+	{
 		name = "Release";
 		min = 4;
 		max = 12;
@@ -285,3 +285,5 @@ params = plugin.manageParams {
 		changed = function(val) jetGain = val end;
 	};
 }
+
+params.resetToDefaults()
