@@ -1,11 +1,11 @@
 --[[
-lower bit resolution with mu law companding
+mu law AFTER
 ]]
 require "include/protoplug"
 local cbFilter = require "include/dsp/cookbook filters"
 
-local bdepth
-local m
+
+local m = 255
 
 local function sign(x)
 	if x > 0 then
@@ -18,17 +18,17 @@ end
 stereoFx.init ()
 function stereoFx.Channel:init ()
 	-- create per-channel fields (filters)
-	
-	self.high = cbFilter {type = "hp"; f = 20; gain = 0; Q = 0.3}
 end
 
 function stereoFx.Channel:processBlock (samples, smax)
+
+    
 	for i = 0, smax do
 	
-	    local s = samples[i]
-	    local u = sign(s) * math.log(1+m*math.abs(s)) / math.log(1+m)
+	    local u = samples[i]
 	    
-	    u = math.floor(bdepth * u) / bdepth
+	    --local u = sign(s) * math.log(1+m*math.abs(s)) / math.log(1+m)
+	
 	    
 	    local c = sign(u)*(math.pow(1+m,math.abs(u))-1)/m
 		
@@ -38,17 +38,10 @@ end
 
 params = plugin.manageParams {
 	{
-		name = "bits";
-		min = 1;
-		max = 8;
-		default = 8;
-		changed = function (val) bdepth = math.pow(2,val) end;
-	};
-	{
 		name = "m";
 		min = 1;
-		max = 255;
-		default = 255;
+		max = 20;
+		default = 10;
 		changed = function (val) m = val end;
 	};
 }

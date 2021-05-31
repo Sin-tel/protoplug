@@ -50,22 +50,21 @@ function polyGen.VTrack:init()
 	
 	
 	self.kap = 0.5
-	self.ap = 0
-	--[[cbFilter
+	self.ap = cbFilter
 	{
 		-- initialize filters with current param values
 		type 	= "ap";
 		f 		= 12000;
 		gain 	= 0;
 		Q 		= 0.7;
-	}]]
+	}
 	
 	self.lp = cbFilter
 	{
 		-- initialize filters with current param values
 		type 	= "hs";
 		f 		= 4000;
-		gain 	= -4;
+		gain 	= -6;
 		Q 		= 0.7;
 	}
 	
@@ -120,15 +119,9 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 		local right = -self.delayR.goBack((1-pos)*len )
         local left  = -self.delayL.goBack(   pos*len )
         
-        --right = self.ap.process(right)
-        local kap = self.kap
-        local d = self.ap
-        local v = right + kap * d
+        right = self.ap.process(right)
         
-        right = -kap*v + d
-        self.ap = v
-        
-        --left = self.lp.process(left)
+        left = self.lp.process(left)
         
         local s = right + left
         
@@ -142,9 +135,9 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
             
             
             
-            hf = 0.5*p*(0.5+0.1*hv) 
+            hf = 1*p*(0.5+0.1*hv) 
             
-            hf = hf * (1.0 + 0.5*nse)
+            hf = hf * (1.0 + 0.2*nse)
             
             hf = math.min(1,hf)
         end
@@ -158,12 +151,14 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 			self.hammer_ef = 0
 		end]]
         
+        local nr = self.mutefilter.process(right)
         
         local damp = self.decay
         if self.finished and not pedal then
             --damp = release
-            right = self.mutefilter.process(right)--*self.release
-            right = right*self.release
+            right = nr*self.release
+        else
+           
         end
         self.delayL.push(right*damp - hf)
         self.delayR.push(left*damp - hf)
@@ -171,7 +166,7 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 		local out = left + right
 		
 		
-		local sample = out*0.02
+		local sample = out*0.1
 		
 		
 		samples[0][i] = samples[0][i] + sample -- left
@@ -194,7 +189,8 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     
 
     --local v = vel/127
-    local v = 2^((vel-127)/30)
+    local v = (vel/127)^2
+    --local v = 2^((vel-127)/30)
     
 	self.vel = v
 
@@ -205,17 +201,23 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	
 	self.decay = math.pow(0.99,0.001/self.f)
 	self.release = math.pow(0.9,0.003/self.f)
-	--print(self.release)
-	
-	self.kap =  1.0 - 100*self.f
-	
-	self.kap = math.max(0,self.kap)
-	
---	print(self.kap)
+
+    local apf = 44100*self.f * 7
+    apf = math.min(18000, apf)
+    self.ap.update({f = apf, Q = 0.7})
 	
 	self.position = position + 0.05*(math.random() - 0.5)
 	
 	self.position = math.max(0.0,math.min(1.0,self.position))
+	
+	local fgain = -0.002/self.f
+	
+	
+	self.lp.update({
+		f 		= 4000;
+		gain 	= fgain;
+		Q 		= 0.7;
+	})
 	
 	--print(self.position)
 	
@@ -263,16 +265,16 @@ params = plugin.manageParams {
 	};
 	{
 		name = "Tune master";
-		min = -0.01;
-		max = 0.01;
-		default = 0.0045;
+		min = -0.1;
+		max = 0.1;
+		default = 0.0694;
 		changed = function(val) tun_m = math.exp(val) end;
 	};
 	{
 		name = "Tune offset";
 		min = -10;
 		max = 10;
-		default = -2.5;
+		default = -1.8;
 		changed = function(val) tun_o = val end;
 	};
 }

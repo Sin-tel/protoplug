@@ -42,22 +42,19 @@ end
 
 function stereoFx.Channel:processBlock (samples, smax)
 	for i = 0, smax do
-	    self.time = self.time + 1/44100
+	    --self.time = self.time + 1/44100
 
 	    local input = samples[i]
 		
 		local s = input - softclip(self.delay.goBack_int(18000*time))*feedback --+ 0.0001*(math.random()-0.5)
 		
 		for i = 1,l do
-		    --local d = self.ap[i].goBack_int(self.len[i]*time + 2*math.sin(10*self.time)) 
 		    local d = self.ap[i]
 		    local v = s + kap * d
-		    
-		    
-		   -- v = softclip(v)
-	        s = -kap*v + d
+
+	        s = kap*v - d
 	        
-	        --v = softclip(v)
+	        
 	        self.ap[i] = v
 		end
 		
@@ -108,19 +105,6 @@ params = plugin.manageParams {
 	    min = 0.01;
 		max = 1;
 		changed = function(val) time = val end;
-	};
-	{
-		name = "seed";
-	    min = 0;
-		max = 100;
-		type = "int";
-		changed = function(val) 
-		    math.randomseed(val);
-		    for i=1,100 do
-                stereoFx.LChannel.len[i] = math.random(900)+90;
-                stereoFx.RChannel.len[i] = math.random(900)+90;
-            end
-		end;
 	};
 }
  
