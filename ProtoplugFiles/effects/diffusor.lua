@@ -26,18 +26,15 @@ function stereoFx.Channel:processBlock (samples, smax)
 
 	    local input = samples[i]
 	    
-	    --local d = self.ap1.goBack_int(500) 
-		--local v = input - kap * d
-		--local signal = kap*v + d
 		
-		local s = input + self.last*feedback
+		local s = input + self.last*feedback + 0.0001*(math.random()-0.5)
 		
 		for i = 1,l do
-		    local d = self.ap[i].goBack_int(self.len[i]) 
+		    local d = self.ap[i].goBack_int(self.len[i]*time) 
 		    local v = s - kap * d
 	        s = kap*v + d
 	        
-	        
+	        --s = math.tanh(s)
 	        self.ap[i].push(v)
 		end
 		
@@ -80,8 +77,14 @@ params = plugin.manageParams {
 	{
 		name = "feedback";
 	    min = 0;
-		max = 1;
+		max = 1.0;
 		changed = function(val) feedback = val end;
+	};
+	{
+		name = "time";
+	    min = 0.01;
+		max = 1;
+		changed = function(val) time = val end;
 	};
 }
  

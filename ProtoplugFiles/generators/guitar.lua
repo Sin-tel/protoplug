@@ -190,6 +190,9 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 
     --local v = vel/127
     local v = (vel/127)^2
+    v = v + 0.024
+    
+
     --local v = 2^((vel-127)/30)
     
 	self.vel = v
