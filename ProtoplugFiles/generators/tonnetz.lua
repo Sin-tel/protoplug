@@ -27,6 +27,10 @@ polyGen.initTracks(24)
 
 pitchbend = 0
 
+glob_feedback = 1.0
+glob_brightness = 1.0
+glob_warble = 1.0
+
 pedal = false
 
 function polyGen.VTrack:init()
@@ -75,16 +79,16 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
             self.env = self.env*decayRate + sustain*(1-decayRate)
         end
         
-        local ff = 0.05
+        local ff = 0.001
         self.noise = self.noise*(1-ff) + (math.random()-0.5)*ff
         
         
 		
-		self.phase = self.phase + (self.f*math.pi*2) + self.noise*0.01
+		self.phase = self.phase + (self.f*math.pi*2) + self.noise*0.02*glob_warble
 		
-		local m1 = math.sin(self.phase*2.00)*0.4*self.vel*self.env
-		local m2 = math.sin(self.phase*7.00)*0.02*self.vel*self.env
-		local fdb = self.fdbck*self.bright*4
+		local m1 = math.sin(self.phase*2.00)*0.4*self.vel*self.env*glob_brightness
+		local m2 = math.sin(self.phase*7.00)*0.02*self.vel*self.env*glob_brightness
+		local fdb = self.fdbck*self.bright*4*glob_feedback
 		
 		
 		local amp = self.env*self.attack*self.vel
@@ -125,9 +129,10 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     
 	self.phase = 0
 	self.vel = 0.0+1.0*(vel/127)^1.5
-	self.bright = math.min(2.0,0.005/self.f)
+	self.bright = math.min(1.0,0.005/self.f)
 	
 	--print(0.005/self.f)
+	print(self.bright)
 end
 
 function temper(note)
@@ -226,4 +231,27 @@ params = plugin.manageParams {
 		default = 0;
 		changed = function(val) cx = 0; cy = 0; end;
 	};
+	{
+		name = "brightness"; 
+		min = 0;
+		max = 2;
+		default = 1;
+		changed = function(val) glob_brightness = math.exp(2*val-2) end;
+	};
+	{
+		name = "fm feedback"; 
+		min = 0;
+		max = 2;
+		default = 1;
+		changed = function(val) glob_feedback = val end;
+	};
+	{
+		name = "pitch warble"; 
+		min = 0;
+		max = 3;
+		default = 1;
+		changed = function(val) glob_warble = val end;
+	};
 }
+
+params.resetToDefaults()

@@ -1,6 +1,8 @@
 --[[
 FIR 2x downsampler
 kaiser window, beta = 6
+
+unoptimized for reference only
 ]]
 
 local FILTER_TAP_NUM = 31
