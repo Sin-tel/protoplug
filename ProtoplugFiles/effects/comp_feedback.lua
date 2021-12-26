@@ -59,11 +59,11 @@ params = plugin.manageParams {
 		changed = function (val) drywet = val end;
 	};
 	{
-		name = "Ratio";
-		min = 1;
-		max = 25;
-		default = 5;
-		changed = function (val) a = val end;
+		name = "Feedback";
+		min = 0;
+		max = 10;
+		default = 3;
+		changed = function (val) a = math.exp(val/3.0) end;
 	};
 	{
 		name = "Threshold";

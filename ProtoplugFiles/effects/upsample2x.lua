@@ -17,24 +17,25 @@ function stereoFx.Channel:init()
 end
 
 function stereoFx.Channel:tick(u)
-	return math.max(-1,math.min(1,u*4))/4
+	return math.max(-1,math.min(1,u))
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0,smax do
 	
 
-	    --self.phase = self.phase + f
-	    --local s = math.sin(self.phase)
 	    local s = samples[i]
 	    
+	    
 	    local u1, u2 = self.upsampler.tick(s)
-	    --local t1, t2 = 
+
 	    u1 = self:tick(u1)
 	    u2 = self:tick(u2)
+	    
 	    local out = self.downsampler.tick(u1, u2)
 	    
-	    --local out = self:tick(s)
+	    
+       -- out = self:tick(s)
 	        
 	    samples[i] = out
 	end
