@@ -9,7 +9,7 @@ local a = 50.0
 local b = 0.5
 local c = 1
 
-local expFactor = -2.0 * math.pi * 1000.0 / 44100
+local expFactor = -1000.0 / 44100
 
 local drywet = 0.0
 
@@ -30,10 +30,10 @@ end
 
 function stereoFx.Channel:processBlock (samples, smax)
 	for i = 0, smax do
-	    local inp = samples[i]/b
-	    local peak = math.abs(inp)*self.gain_p
+	    local inp = samples[i]
+	    local peak = math.abs(inp*b)*self.gain_p
 	    
-	    local gain = 0.5 - 0.5*math.tanh(a*(peak))
+	    local gain = 0.5 - 0.5*math.tanh(a*(peak-1))
 	    
 	    if gain < self.gain_p then
 	        self.gain_p = self.gain_p - (self.gain_p - gain)*attack
@@ -41,8 +41,12 @@ function stereoFx.Channel:processBlock (samples, smax)
 	        self.gain_p = self.gain_p - (self.gain_p - gain)*release
 	    end
 	    
+	    local g = self.gain_p
+	    
 
-		samples[i] = math.tanh(self.gain_p*inp*b*c)*drywet + samples[i]*(1.0-drywet)
+		--samples[i] = g
+		
+		samples[i] = math.tanh(inp*g*c)*drywet + samples[i]*(1.0-drywet)
 	end
 end
 
@@ -63,31 +67,31 @@ params = plugin.manageParams {
 	};
 	{
 		name = "Threshold";
-		min = -24;
+		min = -30;
 		max = 0;
 		default = -12;
-		changed = function (val) b = 10 ^ (val/20.0) end;
+		changed = function (val) b = 10 ^ (-val/20.0) end;
 	};
 		{
 		name = "Attack";
-		min = 5;
-		max = 350;
+		min = 1;
+		max = 200;
 		default = 25;
 		changed = function (val) attack = timeConstant(val) end;
 	};
 		{
 		name = "Release";
-		min = 15;
-		max = 1000;
+		min = 1;
+		max = 400;
 		default = 200;
 		changed = function (val) release = timeConstant(val) end;
 	};
 	{
 		name = "MakeUp";
 		min = 0;
-		max = 12;
+		max = 24;
 		default = 0;
-		changed = function (val) c = 10 ^ (val/20.0); print(c) end;
+		changed = function (val) c = 10 ^ (val/20.0) end;
 	};
 }
 
