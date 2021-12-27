@@ -40,6 +40,12 @@ local function FLine (bufSize)
 			end
 			return sum;
 		end;
+		goBack_int = function (dt)
+			-- todo assert dt<bufSize
+			local fpos = pos - dt + 1 
+			local ipos1 = math.floor(fpos)
+			return buf[bit.band(ipos1, mask)]
+		end;
 		push = function (s)
 			pos = pos - 1
 			if pos < 0 then pos = mask end
