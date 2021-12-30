@@ -57,14 +57,14 @@ local pre_t = 50
 
 local kap = 0.5 -- 0.625
 
-local l1 = 2687 
-local l2 = 4349
-local l3 = 5227
-local l4 = 7547
-local l5 = 349 
-local l6 = 461
-local l7 = 6781
-local l8 = 5381
+local l1 = 1297 
+local l2 = 1453
+local l3 = 3187
+local l4 = 3001
+local l5 = 7109 
+local l6 = 7307
+local l7 = 461
+local l8 = 587
 
 local feedback = 0.4
 
@@ -95,8 +95,8 @@ local lfot = 0
 -- absorption filters
 local shelf1 = cbFilter
 {
-    type    = "hs";
-    f       = 2000;
+    type    = "ls";
+    f       = 200;
     gain    = -3;
     Q       = 0.7;
 }
@@ -144,7 +144,7 @@ function plugin.processBlock (samples, smax)
         local d7 = line7.goBack(l7*time_) 
         local d8 = line8.goBack(l8*time_) 
         
-        local gain = feedback * 1 / (2 * math.sqrt(2))
+        local gain = feedback * 1
         
         -- orthogonal matrix
         local s1 = shelf1.process(sl + (-0.38154601*d1 +0.628773*d2   -0.10215126*d3 -0.30873564*d4 +0.29937741*d5 +0.12424767*d6  -0.49660452*d7 +0.04042556*d8) * gain)
@@ -178,8 +178,8 @@ function plugin.processBlock (samples, smax)
         line8.push(s8)
 
         -- output
-        sl = sl * (1.0-latebalance) +  0.5 * (d1 + d3 + d5 + d7) * latebalance
-        sr = sr * (1.0-latebalance) +  0.5 * (d2 + d4 + d6 + d8) * latebalance
+        sl = sl * (1.0-latebalance) +  0.5 * (d1 +d2 +d3 +d4 +d5 + d6 + d7 + d8) * latebalance
+        sr = sr * (1.0-latebalance) +  0.5 * (d1 -d2 +d3-d4 +d5- d6 + d7- d8) * latebalance
 
         samples[0][i] = input_l*(1.0-balance) + sl*balance
         samples[1][i] = input_r*(1.0-balance) + sr*balance
@@ -191,7 +191,7 @@ function setFeedback(t)
     if t then
         t_60 = t
     end
-    print(t_60)
+    --print(t_60)
     if t_60 > 15 then
         feedback = 1.0
     else
@@ -220,7 +220,7 @@ params = plugin.manageParams {
         
         changed = function(val) pre_t = 1 + val*44100/1000 end;
     };
-   --[[ {
+    --[[{
         name = "Early Size";
         min = 0.1;
         max = 1;
