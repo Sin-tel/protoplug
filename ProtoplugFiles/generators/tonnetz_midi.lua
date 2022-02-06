@@ -6,8 +6,7 @@ remaps 12 edo input to another edo
 
  require "include/protoplug"
 
-
-edo = 22
+edo = 34
 
 fifth = 12*math.floor(edo*math.log(3/2)/math.log(2) + 0.5)/edo
 
@@ -51,6 +50,22 @@ function plugin.processBlock(samples, smax, midiBuf)
 	end
 end
 
+function getch(nt)
+    local ch = 1
+    if nt < 0 then
+        ch = 17
+    end
+    while nt < 0 do
+        nt = nt + edo
+        ch = ch - 1
+    end
+    while nt >= 128 do
+        nt = nt - edo
+        ch = ch + 1
+    end
+    print(ch,nt)
+    return ch, nt
+end
 
 function noteOn(root)
     local nt = root:getNote()
@@ -58,17 +73,16 @@ function noteOn(root)
     
     local tempered = temper(nt)
     local tempnote = math.floor(edo*(tempered-69)/12 + 0.50001) + 69
-   
     
-    if(0 < tempnote and tempnote <= 128) then
-        notes[nt] = tempnote
+    local ch, sendnote = getch(tempnote)
+    
+    notes[nt] = tempnote
 
-        local newEv = midi.Event.noteOn(
-            1,
-            tempnote,
-            root:getVel())
-        table.insert(blockEvents, newEv)
-    end
+    local newEv = midi.Event.noteOn(
+        ch,
+        sendnote,
+        root:getVel())
+    table.insert(blockEvents, newEv)
 end
 
 function noteOff(root)
@@ -76,10 +90,12 @@ function noteOff(root)
     local tempnote = notes[nt]
     
     if tempnote then
+    
+        local ch, sendnote = getch(tempnote)
 
         local newEv = midi.Event.noteOff(
-            1,
-            tempnote)
+            ch,
+            sendnote)
         table.insert(blockEvents, newEv)
     end
 end
@@ -115,8 +131,8 @@ function temper(note)
 	local crx = cx
 	local cry = cy
 	
-	cx = cx + x*0.5
-	cy = cy + y*0.5
+	cx = cx + x*0.2
+	cy = cy + y*0.7
 	
 	
 	local px = math.floor(crx + x + 0.5)

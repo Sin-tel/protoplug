@@ -7,7 +7,7 @@ output edo must support meantone (in the wide sense: superpyth and mavila also w
  require "include/protoplug"
 
 
-edo = 19
+edo = 31
 
 fifth = 12*math.floor(edo*math.log(3/2)/math.log(2) + 0.5)/edo
 
@@ -44,6 +44,22 @@ function plugin.processBlock(samples, smax, midiBuf)
 	end
 end
 
+function getch(nt)
+    local ch = 1
+    if nt < 0 then
+        ch = 17
+    end
+    while nt < 0 do
+        nt = nt + edo
+        ch = ch - 1
+    end
+    while nt >= 128 do
+        nt = nt - edo
+        ch = ch + 1
+    end
+    return ch, nt
+end
+
 function noteOn(root)
     local nt = root:getNote()
     
@@ -52,16 +68,17 @@ function noteOn(root)
     local tempnote = math.floor(edo*(temper(nt)-69)/12 + 0.5) + 69
     
     
-    
-    if(0 < tempnote and tempnote <= 128) then
-        notes[nt] = tempnote
+    local ch, sendnote = getch(tempnote)
 
-        local newEv = midi.Event.noteOn(
-            1,
-            tempnote,
-            root:getVel())
-        table.insert(blockEvents, newEv)
-    end
+    
+    notes[nt] = tempnote
+
+    local newEv = midi.Event.noteOn(
+        ch,
+        sendnote,
+        root:getVel())
+    table.insert(blockEvents, newEv)
+    
 end
 
 function noteOff(root)
@@ -70,9 +87,11 @@ function noteOff(root)
     
     if tempnote then
 
+    	local ch, sendnote = getch(tempnote)
+
         local newEv = midi.Event.noteOff(
-            1,
-            tempnote)
+            ch,
+            sendnote)
         table.insert(blockEvents, newEv)
     end
 end
