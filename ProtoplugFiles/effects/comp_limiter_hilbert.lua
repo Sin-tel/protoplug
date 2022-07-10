@@ -1,6 +1,9 @@
 --[[
-Quick and dirty limiter
+limiter with hilbert peak estimation
 ]]
+
+require("include/protoplug")
+local hilbert = require("include/dsp/hilbert")
 
 require("include/protoplug")
 
@@ -13,15 +16,28 @@ end
 
 local release = timeConstant(80)
 
+local filters = {}
+
 stereoFx.init()
 function stereoFx.Channel:init()
-	self.gain_p = 1
+	self.filter = hilbert()
+
+	self.gain_p = 0
+
+	table.insert(filters, self.filter)
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
 		local inp = samples[i]
-		local peak = math.abs(inp)
+
+		local r, c
+
+		--
+		r, c = self.filter.process(inp)
+
+		local peak = math.sqrt(r * r + c * c)
+		--local peak = math.abs(r)
 
 		local gain = math.min(1.0, 1.0 / peak)
 
@@ -33,9 +49,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		local g = self.gain_p
 
-		--samples[i] = g
-
-		samples[i] = inp * g
+		samples[i] = r * g
 	end
 end
 
@@ -44,7 +58,7 @@ params = plugin.manageParams({
 		name = "Release",
 		min = 1,
 		max = 800,
-		default = 200,
+		default = 20,
 		changed = function(val)
 			release = timeConstant(val)
 		end,

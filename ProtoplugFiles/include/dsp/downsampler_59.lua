@@ -10,7 +10,7 @@ local bit = require("bit")
 
 local band = bit.band
 
-function Downsampler()
+local function Downsampler()
 	local buf = ffi.new("double[?]", 64)
 
 	local pos = 0
