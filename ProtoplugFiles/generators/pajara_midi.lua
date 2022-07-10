@@ -1,16 +1,17 @@
 --[[
 midi version
 output edo must support meantone (in the wide sense: superpyth and mavila also work)
-
 ]]
 
 require("include/protoplug")
 
-edo = 31
+edo = 34 --34, 22, 46
 
 fifth = 12 * math.floor(edo * math.log(3 / 2) / math.log(2) + 0.5) / edo
 
-print(fifth)
+tritone = 6
+
+print(fifth - tritone)
 
 notes = {}
 
@@ -61,7 +62,9 @@ end
 function noteOn(root)
 	local nt = root:getNote()
 
-	local tempnote = math.floor(edo * (temper(nt) - 69) / 12 + 0.5) + 69
+	--print(nt)
+
+	local tempnote = math.floor(edo * (temper(nt) - 69) / 12 + 0.50001) + 69
 
 	local ch, sendnote = getch(tempnote)
 
@@ -84,14 +87,16 @@ function noteOff(root)
 end
 
 function temper(note)
-	local index = note % 12
+	local index = note % 6
 	local oct = note - index
 
 	local cround = math.floor(center + 0.5)
 
-	local pos = ((index * 7 + 5 - cround) % 12 - 5)
+	local pos = (index - cround + 2) % 6 - 2
 
-	if pos ~= 6 then
+	--print(pos)
+
+	if pos ~= 3 then
 		center = center + pos * 0.25
 	end
 

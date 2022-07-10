@@ -10,19 +10,20 @@ local bit = require("bit")
 
 local band = bit.band
 
-function Downsampler ()
+function Downsampler()
 	local buf = ffi.new("double[?]", 64)
 
 	local pos = 0
-	
+
 	return {
-		tick = function (s1, s2)
-			pos = band(pos + 1,63)
+		tick = function(s1, s2)
+			pos = band(pos + 1, 63)
 			buf[pos] = s1
-			pos = band(pos + 1,63)
+			pos = band(pos + 1, 63)
 			buf[pos] = s2
 
 			local s = 0
+			-- stylua: ignore start
 			s = s + 2.567147842452834554e-05 * (buf[pos]                + buf[band(pos - 58, 63)])
 			s = s - 1.261090868996386978e-04 * (buf[band(pos -  2, 63)] + buf[band(pos - 56, 63)])
 			s = s + 3.527441024595549422e-04 * (buf[band(pos -  4, 63)] + buf[band(pos - 54, 63)])
@@ -38,12 +39,13 @@ function Downsampler ()
 			s = s + 5.691759360466236428e-02 * (buf[band(pos - 24, 63)] + buf[band(pos - 34, 63)])
 			s = s - 1.019292916787690184e-01 * (buf[band(pos - 26, 63)] + buf[band(pos - 32, 63)])
 			s = s + 3.168967333911719697e-01 * (buf[band(pos - 28, 63)] + buf[band(pos - 30, 63)])
+			-- -- stylua: ignore end
 
 
 			s = s + 0.5 * buf[band(pos - 29,63)]
 
 			return s
-		end;
+		end,
 	}
 end
 

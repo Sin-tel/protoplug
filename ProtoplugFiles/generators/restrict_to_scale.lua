@@ -4,9 +4,10 @@ description: MIDI processor VST/AU. Remaps midi notes to key/scale. Scales rippe
 author: joule
 --]]
 
-require "include/protoplug"
+require("include/protoplug")
 
 -- scale list with note transposition tables
+-- stylua: ignore
 local scales = {
     { name="None",                keys={0,0,0,0,0,0,0,0,0,0,0,0} },
     { name="Natural Major",       keys={0,-1,0,-1,0,0,-1,0,-1,0,-1,0} },
@@ -48,7 +49,7 @@ local scales = {
 
 -- create a scale list for use in parameter list
 function tidy_scale_list()
-    local scale_list = { }
+    local scale_list = {}
     for k, v in ipairs(scales) do
         scale_list[k] = v.name
     end
@@ -57,9 +58,18 @@ end
 
 -- keys list
 local keys = {
-    "C", "C#", "D", "D#",
-    "E", "F", "F#", "G",
-    "G#", "A", "A#", "B"
+    "C",
+    "C#",
+    "D",
+    "D#",
+    "E",
+    "F",
+    "F#",
+    "G",
+    "G#",
+    "A",
+    "A#",
+    "B",
 }
 
 -- cached parameter values
@@ -71,7 +81,7 @@ function plugin.processBlock(samples, smax, midiBuf)
     for ev in midiBuf:eachEvent() do
         if ev:isNoteOn() or ev:isNoteOff() then
             ev.setNote(ev, restrict_to_scale(ev.getNote(ev)))
-        end	
+        end
     end
 end
 
@@ -90,15 +100,15 @@ table.find = function(tbl, val)
     end
 end
 
-params = plugin.manageParams {
+params = plugin.manageParams({
     {
         name = "Key",
         type = "list",
         values = keys,
         default = 1,
         changed = function(val)
-                      selected_key = table.find(keys,val) - 1
-                  end
+            selected_key = table.find(keys, val) - 1
+        end,
     },
     {
         name = "Scale",
@@ -106,7 +116,7 @@ params = plugin.manageParams {
         values = tidy_scale_list(),
         default = 1,
         changed = function(val)
-                      selected_scale = table.find(tidy_scale_list(), val)
-                  end
-    }
-}
+            selected_scale = table.find(tidy_scale_list(), val)
+        end,
+    },
+})

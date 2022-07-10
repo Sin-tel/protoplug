@@ -2,10 +2,14 @@
 stereo reverb with early reflection section
 ]]
 
-require "include/protoplug"
-local cbFilter = require "include/dsp/cookbook filters"
-local Line = require "include/dsp/delay_line"
+require("include/protoplug")
+local cbFilter = require("include/dsp/cookbook filters")
+local Line = require("include/dsp/delay_line")
 
+-- these are the early reflection coefficients
+-- optimized by a python script to have minimal coloration
+
+-- stylua: ignore start
 tapl = {
     1, 150, 353, 
     546, 661, 683, 
@@ -48,6 +52,7 @@ ampr = {
 -0.08103780888639031, 0.041229283316782016, 
 -0.07247541530737873, 0.07164683067383586, 
 }
+-- stylua: ignore end
 
 local balance = 1.0
 
@@ -57,11 +62,11 @@ local pre_t = 50
 
 local kap = 0.5 -- 0.625
 
-local l1 = 1297 
+local l1 = 1297
 local l2 = 1453
 local l3 = 3187
 local l4 = 3001
-local l5 = 7109 
+local l5 = 7109
 local l6 = 7307
 local l7 = 461
 local l8 = 587
@@ -93,60 +98,58 @@ local line8 = Line(8000)
 local lfot = 0
 
 -- absorption filters
-local shelf1 = cbFilter
-{
-    type    = "ls";
-    f       = 200;
-    gain    = -3;
-    Q       = 0.7;
-}
+local shelf1 = cbFilter({
+    type = "ls",
+    f = 200,
+    gain = -3,
+    Q = 0.7,
+})
 
-local shelf2 = cbFilter
-{
-    type    = "ls";
-    f       = 200;
-    gain    = -3;
-    Q       = 0.7;
-}
+local shelf2 = cbFilter({
+    type = "ls",
+    f = 200,
+    gain = -3,
+    Q = 0.7,
+})
 
-    
-function plugin.processBlock (samples, smax)
+function plugin.processBlock(samples, smax)
     for i = 0, smax do
         -- timing etc
-        lfot = lfot + 1/44100
-        
-        local mod  = 1.0 + 0.005 * math.sin(5.35*lfot)
-        local mod2 = 1.0 + 0.008 * math.sin(3.12*lfot)
+        lfot = lfot + 1 / 44100
 
-        time_ = time_ - (time_  - time)*0.001
-        
+        local mod = 1.0 + 0.005 * math.sin(5.35 * lfot)
+        local mod2 = 1.0 + 0.008 * math.sin(3.12 * lfot)
+
+        time_ = time_ - (time_ - time) * 0.001
+
         --input
 
         local input_l = samples[0][i]
         local input_r = samples[1][i]
-        
+
         local sl = 0
         local sr = 0
 
         -- get early reflections
-        for i,v in ipairs(tapl) do
-            sl = sl + line_l.goBack_int(tapl[i]*time_) * ampl[i]
-            sr = sr + line_r.goBack_int(tapr[i]*time_) * ampr[i]
+        for i, v in ipairs(tapl) do
+            sl = sl + line_l.goBack_int(tapl[i] * time_) * ampl[i]
+            sr = sr + line_r.goBack_int(tapr[i] * time_) * ampr[i]
         end
 
         -- FDN network
-        local d1 = line1.goBack(l1*time_)
-        local d2 = line2.goBack(l2*time_) 
-        local d3 = line3.goBack(l3*time_*mod) 
-        local d4 = line4.goBack(l4*time_*mod2) 
-        local d5 = line5.goBack(l5*time_)
-        local d6 = line6.goBack(l6*time_) 
-        local d7 = line7.goBack(l7*time_) 
-        local d8 = line8.goBack(l8*time_) 
-        
+        local d1 = line1.goBack(l1 * time_)
+        local d2 = line2.goBack(l2 * time_)
+        local d3 = line3.goBack(l3 * time_ * mod)
+        local d4 = line4.goBack(l4 * time_ * mod2)
+        local d5 = line5.goBack(l5 * time_)
+        local d6 = line6.goBack(l6 * time_)
+        local d7 = line7.goBack(l7 * time_)
+        local d8 = line8.goBack(l8 * time_)
+
         local gain = feedback * 1
         
-        -- orthogonal matrix
+        -- randomly generated orthogonal matrix
+        -- stylua: ignore start
         local s1 = shelf1.process(sl + (-0.38154601*d1 +0.628773*d2   -0.10215126*d3 -0.30873564*d4 +0.29937741*d5 +0.12424767*d6  -0.49660452*d7 +0.04042556*d8) * gain)
         local s2 = shelf2.process(sr + (-0.2584172*d1  -0.55174203*d2 -0.06248554*d3 +0.37784024*d4 +0.57404789*d5 -0.03341235*d6  -0.3874204*d7  -0.0373049*d8) * gain)
         local s3 =               (sl + (0.17616566*d1 -0.01007151*d2 -0.04866929*d3 -0.35528839*d4 +0.52151794*d5 +0.13894576*d6  +0.38018032*d7 -0.63595732*d8) * gain)
@@ -155,16 +158,15 @@ function plugin.processBlock (samples, smax)
         local s6 =               (sr + (-0.46884187*d1 +0.2952903*d2  +0.11892298*d3 +0.31459522*d4 +0.24989798*d5 -0.41323626*d6  +0.57250508*d7 +0.13748759*d8) * gain)
         local s7 =               (sl + (0.32402592*d1 +0.20785793*d2 -0.46688196*d3 +0.19598948*d4 -0.05089573*d5 -0.66318809*d6  -0.23372278*d7 -0.31365027*d8) * gain)
         local s8 =               (sr + (-0.64214657*d1 -0.28136637*d2 -0.40599807*d3 -0.22944654*d4 -0.42468347*d5 -0.0248217*d6   +0.07473791*d7 -0.32317593*d8) * gain)
+        -- stylua: ignore end
 
-
-        
         -- update delay lines
         pre_l.push(input_l)
         pre_r.push(input_r)
 
         pl = pre_l.goBack_int(pre_t)
         pr = pre_r.goBack_int(pre_t)
-        
+
         line_l.push(pl)
         line_r.push(pr)
 
@@ -178,16 +180,15 @@ function plugin.processBlock (samples, smax)
         line8.push(s8)
 
         -- output
-        sl = sl * (1.0-latebalance) +  0.5 * (d1 +d2 +d3 +d4 +d5 + d6 + d7 + d8) * latebalance
-        sr = sr * (1.0-latebalance) +  0.5 * (d1 -d2 +d3-d4 +d5- d6 + d7- d8) * latebalance
+        sl = sl * (1.0 - latebalance) + 0.5 * (d1 + d2 + d3 + d4 + d5 + d6 + d7 + d8) * latebalance
+        sr = sr * (1.0 - latebalance) + 0.5 * (d1 - d2 + d3 - d4 + d5 - d6 + d7 - d8) * latebalance
 
-        samples[0][i] = input_l*(1.0-balance) + sl*balance
-        samples[1][i] = input_r*(1.0-balance) + sr*balance
+        samples[0][i] = input_l * (1.0 - balance) + sl * balance
+        samples[1][i] = input_r * (1.0 - balance) + sr * balance
     end
 end
 
 function setFeedback(t)
-    
     if t then
         t_60 = t
     end
@@ -195,31 +196,36 @@ function setFeedback(t)
     if t_60 > 15 then
         feedback = 1.0
     else
-        feedback = 10 ^ (- (60 * 4000 * time) / (t_60 * 44100*20))
+        feedback = 10 ^ (-(60 * 4000 * time) / (t_60 * 44100 * 20))
     end
 end
 
+params = plugin.manageParams({
+    {
+        name = "Dry/Wet",
+        min = 0,
+        max = 1,
+        changed = function(val)
+            balance = val
+        end,
+    },
+    {
+        name = "Balance",
+        min = 0,
+        max = 1,
+        changed = function(val)
+            latebalance = val
+        end,
+    },
+    {
+        name = "PreDelay",
+        min = 0,
+        max = 60,
 
-params = plugin.manageParams {
-    {
-        name = "Dry/Wet";
-        min = 0;
-        max = 1;
-        changed = function(val) balance = val end;
-    };
-    {
-        name = "Balance";
-        min = 0;
-        max = 1;
-        changed = function(val) latebalance = val end;
-    };
-    {
-        name = "PreDelay";
-        min = 0;
-        max = 60;
-        
-        changed = function(val) pre_t = 1 + val*44100/1000 end;
-    };
+        changed = function(val)
+            pre_t = 1 + val * 44100 / 1000
+        end,
+    },
     --[[{
         name = "Early Size";
         min = 0.1;
@@ -227,16 +233,20 @@ params = plugin.manageParams {
         changed = function(val) tmult = val end;
     };]]
     {
-        name = "Size";
-        min = 0.3;
-        max = 1;
-        changed = function(val) time = val; setFeedback() end;
-    };
+        name = "Size",
+        min = 0.3,
+        max = 1,
+        changed = function(val)
+            time = val
+            setFeedback()
+        end,
+    },
     {
-        name = "Decay Time";
-        min = 0;
-        max = 1;
-        changed = function(val) setFeedback(2 ^ (8*val - 4)) end;
-    };
-}
-  
+        name = "Decay Time",
+        min = 0,
+        max = 1,
+        changed = function(val)
+            setFeedback(2 ^ (8 * val - 4))
+        end,
+    },
+})
