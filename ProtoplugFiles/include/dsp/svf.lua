@@ -1,3 +1,5 @@
+-- see: Vadim Zavalishin, The Art of VA Filter Design. p. 110
+
 local M = {}
 
 function M.new(params)
@@ -6,13 +8,13 @@ function M.new(params)
 	local freq = 1
 
 	local public = {
-		update = function(f, res)
+		update = function(f, invRes)
 			f = math.min(0.49, f)
 
 			freq = f
 			params.g = math.tan(math.pi * f)
 
-			params.r = 2 * res
+			params.r = 2 * invRes -- 2R
 			params.h = 1.0 / (1.0 + params.r * params.g + params.g * params.g)
 		end,
 

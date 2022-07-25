@@ -46,7 +46,6 @@ function polyGen.VTrack:init()
 
 	self.kap = 0.5
 	self.ap = cbFilter({
-		-- initialize filters with current param values
 		type = "ap",
 		f = 12000,
 		gain = 0,
@@ -54,7 +53,6 @@ function polyGen.VTrack:init()
 	})
 
 	self.lp = cbFilter({
-		-- initialize filters with current param values
 		type = "hs",
 		f = 4000,
 		gain = -6,
@@ -62,7 +60,6 @@ function polyGen.VTrack:init()
 	})
 
 	self.noisefilter = cbFilter({
-		-- initialize filters with current param values
 		type = "bp",
 		f = 1200,
 		gain = 0,
@@ -70,7 +67,6 @@ function polyGen.VTrack:init()
 	})
 
 	self.mutefilter = cbFilter({
-		-- initialize filters with current param values
 		type = "hs",
 		f = 1000,
 		gain = -6,

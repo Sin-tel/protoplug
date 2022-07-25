@@ -6,13 +6,13 @@ function M.new(p)
 	local freq = 1
 
 	local public = {
-		update = function(f, res)
+		update = function(f, invRes)
 			f = math.min(0.49, f)
 
 			freq = f
 			params.g = math.tan(math.pi * f)
 
-			params.r = 2 * res
+			params.r = 2 * invRes
 			params.h = 1.0 / (1.0 + params.r * params.g + params.g * params.g)
 
 			params.nlgain = 4.0
