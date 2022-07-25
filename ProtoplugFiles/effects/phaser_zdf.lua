@@ -47,29 +47,29 @@ end
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
 		local input = samples[i]
-		
+
 		self.kap = 0.999 * self.kap + 0.001 * kap
 
 		local x = input
 
 		-- compute feedback loop
 		local k = -self.kap
-		local k2 = (1.0 - k*k)
-		
+		local k2 = (1.0 - k * k)
+
 		local G = 1
 		local S = 0
-		
+
 		for i = 1, l do
-		    G = G * k
-		    S = S * k + self.ap[i] * k2
+			G = G * k
+			S = S * k + self.ap[i] * k2
 		end
-		
+
 		local u = (x + feedback * S) / (1 - feedback * G)
-		
+
 		-- "cheap" nonlinear approach, no root solving or any of that
 		u = softclip(u)
-        
-        -- update state
+
+		-- update state
 		for i = 1, l do
 			local d = self.ap[i]
 			local v = u - k * d
