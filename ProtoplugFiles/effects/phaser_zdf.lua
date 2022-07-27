@@ -21,6 +21,16 @@ function softclip(x)
 	end
 end
 
+function softclip_d(x)
+	if x <= -1.5 then
+		return 0
+	elseif x >= 1.5 then
+		return 0
+	else
+		return 1 - (4 / 9) * x * x
+	end
+end
+
 function stereoFx.Channel:init()
 	self.ap = {}
 	self.len = {}
@@ -42,6 +52,8 @@ function stereoFx.Channel:init()
 		gain = -0.2,
 		Q = 0.3,
 	})
+
+	self.uprev = 0
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
@@ -64,12 +76,31 @@ function stereoFx.Channel:processBlock(samples, smax)
 			S = S * k + self.ap[i] * k2
 		end
 
+		-- one iteration of newton-rhapson with guess = 0
 		local u = (x + feedback * S) / (1 - feedback * G)
 
-		-- "cheap" nonlinear approach, no root solving or any of that
-		u = softclip(u)
+		-- previous sample as guess
+		--local u = self.uprev
+
+		--newton-rhapson
+		--[[
+		for i = 1, 4 do
+			local f = softclip(u) - u / (feedback * G) + (x + feedback * S) / (feedback * G)
+			local df = softclip_d(u) - 1 / (feedback * G)
+			u = u - f / df
+		end
+		]]
+
+		-- fixed point iteration
+		--u = x + feedback * (G * softclip(u) + S)
+		--u = x + feedback * (G * softclip(u) + S)
+		--u = x + feedback * (G * softclip(u) + S)
+
+		self.uprev = u
 
 		-- update state
+		u = softclip(u)
+
 		for i = 1, l do
 			local d = self.ap[i]
 			local v = u - k * d
@@ -105,7 +136,8 @@ params = plugin.manageParams({
 		min = 0,
 		max = 6,
 		changed = function(val)
-			kap = 1 - math.exp(-val)
+			local z = 0.49 * math.exp(val - 6)
+			kap = (1 - math.tan(math.pi * z)) / (1 + math.tan(math.pi * z))
 		end,
 	},
 	{

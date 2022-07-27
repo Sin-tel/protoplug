@@ -93,7 +93,8 @@ params = plugin.manageParams({
 		min = 0,
 		max = 6,
 		changed = function(val)
-			kap = 1 - math.exp(-val)
+			local z = 0.49 * math.exp(val - 6)
+			kap = (1 - math.tan(math.pi * z)) / (1 + math.tan(math.pi * z))
 		end,
 	},
 	{
