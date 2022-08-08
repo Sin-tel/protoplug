@@ -15,7 +15,7 @@ function M.new(p)
 			params.r = 2 * invRes
 			params.h = 1.0 / (1.0 + params.r * params.g + params.g * params.g)
 
-			params.nlgain = 4.0
+			params.nlgain = 2.0
 			params.gain = math.sqrt(params.nlgain)
 			params.bias = 0.5 * freq
 		end,
@@ -31,8 +31,14 @@ function M.new(p)
 			-- s1_ = math.tanh(s1_ * params.nlgain) / params.nlgain
 			-- s2_ = math.tanh(s2_ * params.nlgain) / params.nlgain
 
+			-- antisaturator, bad stability
+			-- local fb = params.r * s1_ + 5 * s1_ * math.abs(s1_)
+			-- local a = 0.0
+			-- local fb = params.r * (s1_ + math.atan(s1_))
+			local fb = params.r * s1_
+
 			-- filter update
-			hp = (input - (params.r + params.g) * s1_ - s2_) * params.h
+			hp = (input - fb - params.g * s1_ - s2_) * params.h
 
 			local v1 = params.g * hp
 			bp = v1 + s1_
