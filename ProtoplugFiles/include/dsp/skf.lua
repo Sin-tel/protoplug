@@ -51,8 +51,14 @@ function M.new()
 			local v4 = v3 + s2_
 			s2_ = v4 + v3
 
+			-- lowpass
 			return v4
-			-- return v2 - v4 --bp
+
+			-- bandpass
+			-- return v2 - v4
+
+			-- highpass
+			-- return u - 2 * v2 + v4
 		end,
 	}
 	return public
