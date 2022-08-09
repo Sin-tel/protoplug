@@ -1,17 +1,34 @@
--- Sallen-Key filter with nonlinearity
+-- Multimode Sallen-Key filter with nonlinearity
+-- LP -> HP
 
 local M = {}
 
 -- cheap non-symmetric distortion
-local function dist(x)
+local function dist2(x)
 	return x / (1 + math.abs(x) + 0.4 * x)
+end
+
+local function hardclip(x)
+	return math.min(math.max(x, -1.0), 1.0)
+end
+
+-- curve approximating feedback path in MS20
+local function dist(x)
+	local v = 5 * x
+	v = v / math.sqrt(1 + v * v)
+	local a = 0.135
+	return a * x + (1 - a) * v / 5
+end
+
+local function crossover(x)
+	return math.tanh(x - math.tanh(50 * x) / 50)
 end
 
 function M.new()
 	local params = {}
 	local s1_, s2_ = 0, 0
 	local freq = 1
-	local a0, a1, a2, a3, a4, a5 = 0, 0, 0, 0, 0, 0
+	local a0, a1, a2, a3 = 0, 0, 0, 0
 
 	local public = {
 		update = function(f, res)
@@ -36,29 +53,35 @@ function M.new()
 			local u = (x + params.k * S) / (1 - params.k * G)
 
 			-- distortion in feedback
-			u = x + params.k * dist(G * u + S)
+			u = x + dist(params.k * (G * u + S))
+			-- u = x + math.tanh(5 * params.k * (G * u + S)) / 5
+			-- u = x + hardclip(2 * params.k * (G * crossover(u) + S)) / 2
 
 			-- distortion in filter input
-			u = dist(u * 0.5) * 2
+			-- u = dist2(u * 0.5) * 2
+			-- u = hardclip(u)
+			-- u = math.tanh(u * 0.5) * 2
+
+			-- u = crossover(u)
 
 			-- update
 			-- one pole LP
 			local v1 = (u - s1_) * a0
-			local v2 = v1 + s1_
-			s1_ = v2 + v1
+			local y1 = v1 + s1_
+			s1_ = math.tanh(y1) + v1
 			-- one pole LP
-			local v3 = (v2 - s2_) * a0
-			local v4 = v3 + s2_
-			s2_ = v4 + v3
+			local v2 = (y1 - s2_) * a0
+			local y2 = v2 + s2_
+			s2_ = math.tanh(y2) + v2
 
 			-- lowpass
-			return v4
+			return y2
 
 			-- bandpass
-			-- return v2 - v4
+			-- return y1 - y2
 
 			-- highpass
-			-- return u - 2 * v2 + v4
+			-- return u - 2 * y1 + y2
 		end,
 	}
 	return public
