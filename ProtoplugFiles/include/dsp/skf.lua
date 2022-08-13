@@ -1,5 +1,6 @@
 -- Multimode Sallen-Key filter with nonlinearity
 -- LP -> HP
+-- nonlinearity evaluated using the 'cheap' method + fixed point iteration
 
 local M = {}
 
@@ -18,6 +19,10 @@ local function dist(x)
 	v = v / math.sqrt(1 + v * v)
 	local a = 0.135
 	return a * x + (1 - a) * v / 5
+end
+
+local function dist3(x)
+	return math.tanh(x + 0.3 * math.abs(x))
 end
 
 local function crossover(x)
@@ -54,25 +59,23 @@ function M.new()
 
 			-- distortion in feedback
 			u = x + dist(params.k * (G * u + S))
-			-- u = x + math.tanh(5 * params.k * (G * u + S)) / 5
-			-- u = x + hardclip(2 * params.k * (G * crossover(u) + S)) / 2
 
-			-- distortion in filter input
-			-- u = dist2(u * 0.5) * 2
-			-- u = hardclip(u)
-			-- u = math.tanh(u * 0.5) * 2
-
-			-- u = crossover(u)
+			-- fixed point iter
+			u = x + params.k * (G * dist2(u) + S)
+			u = x + params.k * (G * dist2(u) + S)
 
 			-- update
+			u = dist2(u)
+
 			-- one pole LP
 			local v1 = (u - s1_) * a0
 			local y1 = v1 + s1_
-			s1_ = math.tanh(y1) + v1
+			s1_ = y1 + v1
+
 			-- one pole LP
 			local v2 = (y1 - s2_) * a0
 			local y2 = v2 + s2_
-			s2_ = math.tanh(y2) + v2
+			s2_ = y2 + v2
 
 			-- lowpass
 			return y2

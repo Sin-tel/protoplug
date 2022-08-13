@@ -2,11 +2,20 @@
 
 local M = {}
 
+local function dist(x)
+	return math.log(x + math.sqrt(1 + x * x))
+end
+
+-- cheap non-symmetric distortion
+local function dist2(x)
+	return x / (1 + math.abs(x) + 0.4 * x)
+end
+
 function M.new()
 	local params = {}
 	local s1_, s2_, s3_, s4_ = 0, 0, 0, 0
 	local freq = 1
-	local a0, a1, a2, a3 = 0, 0, 0, 0
+	local a0, a1 = 0, 0
 
 	local prev = 0
 
@@ -34,11 +43,11 @@ function M.new()
 			local u = (x - params.k * S) / (1 + params.k * G)
 
 			-- fixed point iter
-			u = x - params.k * (G * math.tanh(u) + S)
-			u = x - params.k * (G * math.tanh(u) + S)
+			u = x - params.k * (G * dist2(u) + S)
+			u = x - params.k * (G * dist2(u) + S)
 
 			-- update
-			u = math.tanh(u)
+			u = dist2(u)
 
 			local v1 = (u - s1_) * a0
 			local y1 = v1 + s1_
