@@ -1,3 +1,5 @@
+-- ladder distortion as one the output of some cheap FM chips
+
 require("include/protoplug")
 local cbFilter = require("include/dsp/cookbook filters")
 
