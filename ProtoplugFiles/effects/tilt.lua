@@ -1,68 +1,70 @@
+--[[
+Tilt the whole spectrum by some slope
+(e.g. turn white noise into pink noise using a -3db/o slope)
+]]
 
 require("include/protoplug")
-local cbFilter = require("include/dsp/cookbook filters")
+local Filter = require("include/dsp/cookbook_svf")
 
-local a = 0.0
-local b = 0.0
-local c = 0.0
+local f1 = 20 * math.sqrt(10)
+local f2 = 200
+local f3 = 200 * math.sqrt(10)
+local f4 = 2000
+local f5 = 2000 * math.sqrt(10)
+
+local q = 0.5
+
+filters = {}
 
 stereoFx.init()
 function stereoFx.Channel:init()
-	self.rand = 0.1
-	self.a0 = 0
-	self.a1 = 0
-	self.a2 = 0
-	
-	self.hp = cbFilter({ type = "hp", f = 20, gain = 0, Q = 0.7 })
+	self.f1 = Filter({ type = "tilt", f = f1, gain = 0, Q = q })
+	self.f2 = Filter({ type = "tilt", f = f2, gain = 0, Q = q })
+	self.f3 = Filter({ type = "tilt", f = f3, gain = 0, Q = q })
+	self.f4 = Filter({ type = "tilt", f = f4, gain = 0, Q = q })
+	self.f5 = Filter({ type = "tilt", f = f5, gain = 0, Q = q })
+
+	table.insert(filters, self.f1)
+	table.insert(filters, self.f2)
+	table.insert(filters, self.f3)
+	table.insert(filters, self.f4)
+	table.insert(filters, self.f5)
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
 		local s = samples[i]
-		
-		self.rand = self.rand * 3.0
-		self.rand = self.rand + ((self.rand > 2) and -1 or 0)
-		self.rand = self.rand + ((self.rand > 1) and -1 or 0)
-		
-		local noise = self.rand * 2.0 - 1.0
-		
-		--local noise = math.random() * 2.0 - 1.0
-		
 
-		self.a0 = 0.99765 * self.a0 + noise * 0.0990460;
-		self.a1 = 0.96300 * self.a1 + noise * 0.2965164;
-		self.a2 = 0.57000 * self.a2 + noise * 1.0526913;
-		noise = self.a0 + self.a1 + self.a2 + noise * 0.1848; 
-		noise = noise * 0.2;
-		
-		--local out = math.abs(noise*noise)
-		
+		s = self.f1.process(s)
+		s = self.f2.process(s)
+		s = self.f3.process(s)
+		s = self.f4.process(s)
+		s = self.f5.process(s)
 
-		local out = math.random() * 2.0 - 1.0
-		
-		out = self.hp.process(out)
-
-
-		samples[i] = out*0.1
+		samples[i] = s * g_fact
 	end
 end
-params = plugin.manageParams {
+
+function updateFilters()
+	for i, v in ipairs(filters) do
+		v.update({ gain = gain })
+	end
+end
+
+params = plugin.manageParams({
 	{
-		name = "a";
-		min = 0;
-		max = 1;
-		changed = function (val) a = val end;
-	};
-	{
-		name = "b";
-		min = 0;
-		max = 1;
-		changed = function (val) b = val end;
-	};
-	{
-		name = "c";
-		min = 0;
-		max = 1;
-		changed = function (val) c = val end;
-	};
-}
+		name = "slope (dB/oct)",
+		min = -12,
+		max = 12,
+		changed = function(val)
+			-- filters are spaced by half-decades
+			-- 6db/o ~ 20db/decade
+			gain = 10 * val / 6
+
+			-- some heuristic overall gain
+			g_fact = 10 ^ (-math.abs(val) / 10)
+			print(g_fact)
+			updateFilters()
+		end,
+	},
+})
