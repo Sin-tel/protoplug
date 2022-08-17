@@ -26,11 +26,15 @@ filter types :
 	eq: Peaking EQ filter
 --]]
 
-local function Filter(params)
+local function Filter(args)
 	local a0, a1, a2, b0, b1, b2
 	local x0, x1, x2 = 0, 0, 0
 	local y0, y1, y2 = 0, 0, 0
-	local params = params or { type = "lp", f = 440, gain = 0, Q = 1 }
+	local params = { type = "lp", f = 440, gain = 0, Q = 1 }
+	args = args or {}
+	for k, v in pairs(args) do
+		params[k] = v
+	end
 
 	public = {
 		update = function(args)

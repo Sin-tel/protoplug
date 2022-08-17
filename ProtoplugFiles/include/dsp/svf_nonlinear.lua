@@ -1,3 +1,8 @@
+--[[
+Svf with naive nonlinear integrator states.
+Does not really work well, the filters change their frequency response under saturation.
+]]
+
 local M = {}
 
 function M.new(p)
