@@ -25,9 +25,8 @@ function stereoFx.Channel:init()
 end
 
 function stereoFx.Channel:tick(u)
-	return self.filter.process(gain*u)/gain
+	return self.filter.process(gain * u) / gain
 end
-
 
 function updateFilters()
 	for i, v in ipairs(filters) do
@@ -77,5 +76,4 @@ params = plugin.manageParams({
 			gain = math.exp(val)
 		end,
 	},
-	
 })

@@ -78,7 +78,7 @@ function M.new()
 		process = function(x)
 			-- evaluate the non-linear gains
 			local tk = distdx(r * (s1_ - s2_)) -- feedback
-			local t0 = dist2dx(x + r * (s1_ - s2_)) -- input
+			local t0 = dist2dx(x + tk * r * (s1_ - s2_)) -- input
 			local t1 = tanhdx(s1_) -- integrators
 			local t2 = tanhdx(s2_)
 
@@ -93,15 +93,15 @@ function M.new()
 			-- slightly less efficient version
 			-- local y1 = g1 * (s1_ + f * y0)
 			-- local y2 = g2 * (s2_ + f * t1 * y1)
-			-- s1_ = s1_ + 2 * f * (t0 * y0 - t1 * y1)
+			-- s1_ = s1_ + 2 * f * (y0 - t1 * y1)
 			-- s2_ = s2_ + 2 * f * (t1 * y1 - t2 * y2)
 
 			-- solve remaining outputs
 			local y1 = t1 * g1 * (s1_ + f * y0)
 			local y2 = t2 * g2 * (s2_ + f * y1)
 
-			-- -- update state
-			s1_ = s1_ + 2 * f * (t0 * y0 - y1)
+			-- update state
+			s1_ = s1_ + 2 * f * (y0 - y1)
 			s2_ = s2_ + 2 * f * (y1 - y2)
 
 			-- lowpass
