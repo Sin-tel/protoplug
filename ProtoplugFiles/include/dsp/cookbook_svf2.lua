@@ -66,7 +66,6 @@ local function Filter(args)
 			g = math.tan(math.pi * params.f / sample_rate)
 			k = 1.0 / params.Q
 			local a = math.pow(10, params.gain / 40)
-			--g1 = 1.0 / (1.0 + g * (g + k))
 			if params.type == "lp" then
 				m0 = 0.0
 				m1 = 0.0

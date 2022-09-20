@@ -1,5 +1,7 @@
 --[[
-MIDI mapper for linnstrument in channel per note mode
+MIDI mapper for linnstrument in channel per row mode
+put linnstrument in MPE mode, but set pressure to 'poly pres'
+output is not MPE, use poly AT for pressure, and put your synth in the specified EDO tuning.
 it can do polyphonic aftertouch, pitchbends are good enough to do vibrato but sliding is probably awkward
 ]]
 
@@ -7,9 +9,11 @@ require("include/protoplug")
 
 notes = {}
 
+-- change these numbers to what you need
+-- this setup is for 41edo magic / Kite tuning
 up = 13
-left = 5
-edo = 31
+left = 2
+edo = 41
 
 lastch = 0
 
