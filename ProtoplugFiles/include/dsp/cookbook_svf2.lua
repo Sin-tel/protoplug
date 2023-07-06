@@ -2,10 +2,16 @@
 nonlinear version
 
 system:
-	y0 = x - atanh(k*y1) - y2
+	y0 = x - atanh(tk*y1) - y2
 	dy1/dt = f * tanh(y0)
 	dy2/dt = f * tanh(y1)
-discretize (tk replaces k)
+discretize using trapezoidal integrators
+and using "nonlinear gains" t0 and t1 for the nonlinearities
+(linearizing around operating point)
+eg:    let t0 = tanh(y0)/y0
+  then tanh(y0) = t0 * y0
+
+
 	y0 = x - tk*y1 - y2
 	y1 = s1 + f * t0*y0
 	y2 = s2 + f * t1*y1
@@ -13,7 +19,7 @@ discretize (tk replaces k)
 	s1 = s1 + 2 * f * t0*y0
 	s2 = s2 + 2 * f * t1*y1
 
-maxima code: 
+maxima code:
 
 declare([s1,s2,x], mainvar);
 		solve([
@@ -50,11 +56,11 @@ local function Filter(args)
 		params[k] = v
 	end
 
-	public = {
+	local public = {
 		update = function(args)
 			args = args or {}
-			for k, v in pairs(args) do
-				params[k] = v
+			for key, v in pairs(args) do
+				params[key] = v
 			end
 
 			if not plugin.isSampleRateKnown() then

@@ -1,7 +1,7 @@
 --[[
 Sallen-Key filter
 
-     y0       y1        
+     y0       y1
 x->+---> [LP] -.-> [LP] -.-> y2
    ^           |         |
    |           v  (-)    |
@@ -15,7 +15,7 @@ Nonlinearities evaluated using Mystran's secant method
 		dy2/dt = f * (tanh(y1) - tanh(y2))
 
 	(tanh can be replaced by other nonlinearities)
-	
+
 	Trapezoidal integration + linearizing tanh(x0) as t0*x0 gives:
 		y0 = t0 * (x + tk * r * (y1 - y2))
 		y1 = s1 + f * (y0 - t1 * y1)
@@ -33,7 +33,7 @@ Nonlinearities evaluated using Mystran's secant method
 		g2 = 1 / (1 + f*t2)
 
 	Maxima code:
-	
+
 	declare([s1,s2,x], mainvar);
 		solve([
 			y0 = t0 * (x + tk * r * (y1 - y2)),
