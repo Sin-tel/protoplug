@@ -1,12 +1,12 @@
 --[[
-20 pole phase with zero delay feedback path
+n pole phase with zero delay feedback path
 ]]
 
 require("include/protoplug")
 local cbFilter = require("include/dsp/cookbook filters")
 
 local kap = 0.625
-local l = 20
+local l = 8
 local feedback = 0
 
 stereoFx.init()
@@ -77,24 +77,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 		end
 
 		-- one iteration of newton-rhapson with guess = 0
-		local u = (x + feedback * S) / (1 - feedback * G)
-
-		-- previous sample as guess
-		--local u = self.uprev
-
-		--newton-rhapson
-		--[[
-		for i = 1, 4 do
-			local f = softclip(u) - u / (feedback * G) + (x + feedback * S) / (feedback * G)
-			local df = softclip_d(u) - 1 / (feedback * G)
-			u = u - f / df
-		end
-		]]
-
-		-- fixed point iteration
-		--u = x + feedback * (G * softclip(u) + S)
-		--u = x + feedback * (G * softclip(u) + S)
-		--u = x + feedback * (G * softclip(u) + S)
+		local u = (x - feedback * S) / (1 + feedback * G)
 
 		self.uprev = u
 
@@ -110,7 +93,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 			self.ap[i] = v
 		end
 
-		local signal = u
+		local signal = -u
 
 		samples[i] = (input * (1.0 - balance) + signal * balance)
 	end
@@ -142,7 +125,7 @@ params = plugin.manageParams({
 	},
 	{
 		name = "feedback",
-		min = -1.0,
+		min = 0,
 		max = 1.0,
 		changed = function(val)
 			feedback = val

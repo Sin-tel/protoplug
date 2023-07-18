@@ -21,15 +21,15 @@ local time = 1.0
 local t_60 = 1.0
 
 --- init
-line1 = Line(8000)
-line2 = Line(8000)
-line3 = Line(8000)
-line4 = Line(8000)
+local line1 = Line(8000)
+local line2 = Line(8000)
+local line3 = Line(8000)
+local line4 = Line(8000)
 
-apl = {}
-apr = {}
-apln = {}
-aprn = {}
+local apl = {}
+local apr = {}
+local apln = {}
+local aprn = {}
 for i = 1, 3 do
 	apl[i] = Line(800)
 	apr[i] = Line(800)
@@ -42,24 +42,24 @@ aprn[1] = 53
 aprn[2] = 347
 aprn[3] = 251
 
-lfot = 0
+local lfot = 0
 
 -- absorption filters
-shelf1 = cbFilter({
+local shelf1 = cbFilter({
 	type = "hs",
 	f = 8000,
 	gain = -3,
 	Q = 0.7,
 })
 
-shelf2 = cbFilter({
+local shelf2 = cbFilter({
 	type = "hs",
 	f = 8000,
 	gain = -3,
 	Q = 0.7,
 })
 
-time_ = 1.0
+local time_ = 1.0
 
 function plugin.processBlock(samples, smax)
 	for i = 0, smax do
@@ -118,7 +118,7 @@ function plugin.processBlock(samples, smax)
 	end
 end
 
-function setFeedback(t)
+local function setFeedback(t)
 	if t then
 		t_60 = t
 	end

@@ -18,6 +18,11 @@ local delay = 140
 local prev_l = 0.0
 local prev_r = 0.0
 
+local hp_l = 0.0
+local hp_r = 0.0
+
+highpass_f = 0.1
+
 function plugin.processBlock(samples, smax)
 	for i = 0, smax do
 		local in_l = samples[0][i]
@@ -40,8 +45,15 @@ function plugin.processBlock(samples, smax)
 		prev_l = v_l
 		prev_r = v_r
 
-		samples[0][i] = in_l + amount * out_l
-		samples[1][i] = in_r - amount * out_r
+		-- highpass
+		local y_l = (out_l - hp_l)
+		local y_r = (out_r - hp_r)
+
+		hp_l = hp_l + highpass_f * y_l
+		hp_r = hp_r + highpass_f * y_r
+
+		samples[0][i] = in_l + amount * y_l
+		samples[1][i] = in_r - amount * y_r
 	end
 end
 
@@ -52,6 +64,15 @@ params = plugin.manageParams({
 		max = 1,
 		changed = function(val)
 			amount = val
+		end,
+	},
+	{
+		name = "low cut",
+		min = 0,
+		max = 6,
+		changed = function(val)
+			highpass_f = math.exp(-val)
+			print(highpass_f)
 		end,
 	},
 })
