@@ -11,11 +11,9 @@ local balance = 1
 local a = 0
 local b = 0
 
-local c = 0.18
-
-local alpha = 0.2
-local m_sat = 1
-local k = 5
+local c = 0.35
+local alpha = 0.28
+local k = 1
 
 function sgn(x)
 	if x > 0 then
@@ -37,22 +35,24 @@ function stereoFx.Channel:init()
 	self.m_irr = 0
 	self.high = cbFilter({ type = "hp", f = 10, gain = 0, Q = 0.7 })
 	self.pre = cbFilter({ type = "tilt", f = 400, gain = 6, Q = 0.4 })
-	self.post = cbFilter({ type = "tilt", f = 400, gain = -6, Q = 0.4 })
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		local s = self.pre.process(samples[i] * a)
+		local s = self.pre.process(samples[i] * a * 0.4)
+		--local s = samples[i] * a
 		local diff = s - self.prev
 		self.prev = s
 
 		local h_eff = s + alpha * self.m
-		local m_anh = m_sat * math.tanh(h_eff / alpha)
+		local m_anh = math.tanh(h_eff / alpha)
 
-		local delta = sgn(diff)
+		--local delta = sgn(diff)
 
 		-- possible divide by zero?
-		local d_m_irr = diff * (m_anh - self.m_irr) / (k * delta - alpha * (m_anh - self.m_irr))
+		--local d_m_irr = diff * (m_anh - self.m_irr) / (k * delta - alpha * (m_anh - self.m_irr))
+
+		local d_m_irr = math.abs(diff) * (m_anh - self.m_irr) / k
 
 		-- leaky integration to prevent build-up
 		self.m_irr = self.m_irr * 0.99 + d_m_irr
@@ -63,8 +63,8 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		local out = self.m
 
-		out = self.high.process(out) * b / a
-		out = self.post.process(out)
+		out = self.high.process(out)
+		out = out * b / a
 
 		samples[i] = (1.0 - balance) * samples[i] + balance * out
 	end
@@ -82,9 +82,9 @@ params = plugin.manageParams({
 	},
 	{
 		name = "drive",
-		min = -24,
-		max = 0,
-		default = -12,
+		min = -12,
+		max = 12,
+		default = 0,
 		changed = function(val)
 			a = math.pow(10, val / 20)
 		end,
