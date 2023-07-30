@@ -1,3 +1,5 @@
+-- Add (mostly) second harmonic
+
 require("include/protoplug")
 local cbFilter = require("include/dsp/cookbook_svf")
 
@@ -7,21 +9,20 @@ local c = 0
 
 local balance = 1
 
-function tanhdx(x)
-	local a = x * x
-	return ((a + 105.0) * a + 945.0) / ((15.0 * a + 420.0) * a + 945.0)
+function softclip(x)
+	local s = math.min(math.max(x, -3.0), 3.0)
+	return s * (27.0 + s * s) / (27.0 + 9.0 * s * s)
 end
 
 function tube(x)
-	return x * tanhdx(x - 0.5)
+	local s = math.max(x, -0.5)
+	local s = s + s * s
+	return softclip(s)
 end
 
 stereoFx.init()
 function stereoFx.Channel:init()
-	self.prev = 0
 	self.high = cbFilter({ type = "hp", f = 10, gain = 0, Q = 0.7 })
-	self.low = cbFilter({ type = "lp", f = 5, gain = 0, Q = 1.0 })
-
 	self.pre = cbFilter({ type = "tilt", f = 300, gain = 3, Q = 0.4 })
 	self.post = cbFilter({ type = "tilt", f = 300, gain = -3, Q = 0.4 })
 end
@@ -30,15 +31,13 @@ function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
 		local s = samples[i] * a
 
-		local w = math.max(0, s)
-
-		w = self.low.process(w)
 		s = self.pre.process(s)
 
-		local out = tube(s - w + 0.5)
+		local out = tube(s)
 
-		out = self.high.process(out) * b / a
 		out = self.post.process(out)
+		out = out / a * b
+		out = self.high.process(out)
 
 		samples[i] = (1.0 - balance) * samples[i] + balance * out
 	end
@@ -55,8 +54,8 @@ params = plugin.manageParams({
 	},
 	{
 		name = "drive",
-		min = 0,
-		max = 36,
+		min = -12,
+		max = 12,
 		changed = function(val)
 			a = math.pow(10, val / 20)
 		end,
@@ -64,7 +63,7 @@ params = plugin.manageParams({
 	{
 		name = "output",
 		min = 0,
-		max = 36,
+		max = 12,
 		changed = function(val)
 			b = math.pow(10, val / 20)
 		end,

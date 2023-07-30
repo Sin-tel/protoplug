@@ -123,8 +123,8 @@ local function Filter(args)
 
 		process = function(x)
 			local tk = k + 0.2 * s1_ * s1_ -- cubic distortion
-			local t0 = tanhdx(x - tk * s1_ - s2_)
-			local t1 = tanhdx(s1_)
+			local t0 = dist2dx(x - tk * s1_ - s2_)
+			local t1 = dist2dx(s1_)
 
 			-- solve for y1
 			local y1 = (g * t0 * (x - s2_) + s1_) / (g * t0 * (tk + g * t1) + 1)

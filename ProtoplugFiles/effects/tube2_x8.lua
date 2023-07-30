@@ -12,6 +12,7 @@ local a = 0
 local b = 0
 local balance = 1
 local c = 0
+local bias = 0.4
 
 stereoFx.init()
 
@@ -34,7 +35,7 @@ function stereoFx.Channel:init()
 end
 
 function stereoFx.Channel:tick(u)
-	u = u - 0.4
+	u = u - bias
 	local s = math.max(u, 0)
 	local z = u + s ^ 4
 
@@ -95,6 +96,15 @@ params = plugin.manageParams({
 		default = 0,
 		changed = function(val)
 			a = math.pow(10, val / 20)
+		end,
+	},
+	{
+		name = "bias",
+		min = 0,
+		max = 1,
+		default = 0,
+		changed = function(val)
+			bias = val * 0.4
 		end,
 	},
 	{
