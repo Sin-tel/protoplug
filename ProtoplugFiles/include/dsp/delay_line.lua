@@ -1,7 +1,4 @@
---[[
-delay line 1
-with dc filter and shitty linear interpolation
-]]
+-- fractional delay with linear interpolation
 
 local function blend(a, b, p)
 	return (a * p + b * (1 - p))
@@ -13,8 +10,7 @@ function Line(bufSize)
 	local buf = ffi.new("double[?]", bufSize)
 	local mask = bufSize - 1
 
-	local pos = 0 -- todo int
-	local dc1, dc2 = 0, 0
+	local pos = 0
 	return {
 		goBack = function(dt)
 			-- todo assert dt<bufSize
@@ -35,11 +31,6 @@ function Line(bufSize)
 			if pos >= bufSize then
 				pos = 0
 			end
-			--[[dc1 = dc1 + (s - dc2) * 0.000002
-			dc2 = dc2 + dc1
-			dc1 = dc1 * 0.96
-						if (pos)>=bufSize or (pos)<0 then error("accessed buf "..(pos)) end -- DEBUG
-			buf[pos] = s - dc2]]
 			buf[pos] = s
 		end,
 	}

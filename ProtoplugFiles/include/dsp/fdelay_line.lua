@@ -1,5 +1,4 @@
--- fractional delay line 1
--- with lagrange interpolation
+-- fractional delay with lagrange interpolation
 
 local function FLine(bufSize)
 	local n, e = math.frexp(bufSize)
@@ -9,7 +8,6 @@ local function FLine(bufSize)
 	local h = { [0] = 0, 0, 0, 0 }
 	local pos = 0
 	local ptL = 0
-	local dc1, dc2 = 0, 0
 	local lastdt = math.huge
 	local function CalcCoeffs(delay)
 		local intd = math.floor(delay)
@@ -19,7 +17,6 @@ local function FLine(bufSize)
 		local Dm2 = Dm1 - 1
 		local Dm3 = Dm1 - 2
 		local DxDm1 = D * Dm1
-		--//float Dm1xDm2 = Dm1 * Dm2;
 		local Dm2xDm3 = Dm2 * Dm3
 		h[0] = (-1 / 6.) * Dm1 * Dm2xDm3
 		h[1] = 0.5 * D * Dm2xDm3
@@ -41,7 +38,7 @@ local function FLine(bufSize)
 		end,
 		goBack_int = function(dt)
 			-- todo assert dt<bufSize
-			local fpos = pos - dt + 1
+			local fpos = pos + dt + 1
 			local ipos1 = math.floor(fpos)
 			return buf[bit.band(ipos1, mask)]
 		end,
@@ -56,12 +53,6 @@ local function FLine(bufSize)
 			for i = 0, bufSize - 1 do
 				buf[i] = 0
 			end
-		end,
-		dc_remove = function(s)
-			dc1 = dc1 + (s - dc2) * 0.000002
-			dc2 = dc2 + dc1
-			dc1 = dc1 * 0.96
-			return s - dc2
 		end,
 	}
 end

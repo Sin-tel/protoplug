@@ -1,10 +1,13 @@
 require("include/protoplug")
-local Upsampler = require("include/dsp/upsampler_11")
-local Downsampler11 = require("include/dsp/downsampler_11")
--- local Downsampler19 = require("include/dsp/downsampler_19")
--- local Downsampler31 = require("include/dsp/downsampler_31")
--- local Downsampler59 = require("include/dsp/downsampler_59")
+local Upsampler11 = require("include/dsp/upsampler_11")
+local Upsampler19 = require("include/dsp/upsampler_19")
+local Upsampler31 = require("include/dsp/upsampler_31")
+local Downsampler19 = require("include/dsp/downsampler_19")
+local Downsampler31 = require("include/dsp/downsampler_31")
+local Downsampler59 = require("include/dsp/downsampler_59")
 local cbFilter = require("include/dsp/cookbook_svf")
+
+Delayline = require("include/dsp/fdelay_line")
 
 local samplerate = 44100
 
@@ -24,12 +27,14 @@ end
 -- everything is per stereo channel
 function stereoFx.Channel:init()
 	self.phase = 0
-	self.upsampler = Upsampler()
-	self.upsampler2 = Upsampler()
-	self.upsampler3 = Upsampler()
-	self.downsampler = Downsampler11()
-	self.downsampler2 = Downsampler11()
-	self.downsampler3 = Downsampler11()
+	self.upsampler = Upsampler31()
+	self.upsampler2 = Upsampler19()
+	self.upsampler3 = Upsampler11()
+	self.downsampler = Downsampler59()
+	self.downsampler2 = Downsampler31()
+	self.downsampler3 = Downsampler19()
+
+	self.dry_delay = Delayline(32)
 
 	self.high = cbFilter({ type = "hp", f = 10, gain = 0, Q = 0.7 })
 end
@@ -44,7 +49,14 @@ end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		local s = samples[i] * a
+		local s = samples[i]
+
+		self.dry_delay.push(s)
+
+		-- oversampling adds 20 samples of delay
+		local dry = self.dry_delay.goBack_int(20)
+
+		s = s * a
 
 		local u1, u2 = self.upsampler.tick(s)
 
@@ -70,12 +82,10 @@ function stereoFx.Channel:processBlock(samples, smax)
 			self.downsampler2.tick(self.downsampler.tick(s5, s6), self.downsampler.tick(s7, s8))
 		)
 
-		out = self.high.process(out) * b / a
+		out = out * b / a
+		out = self.high.process(out)
 
-		-- TODO: compensate dry latency
-		--samples[i] = (1.0 - balance) * samples[i] + balance * out
-
-		samples[i] = out
+		samples[i] = (1.0 - balance) * dry + balance * out
 	end
 end
 
@@ -91,7 +101,7 @@ params = plugin.manageParams({
 	},
 	{
 		name = "drive",
-		min = 0,
+		min = -12,
 		max = 36,
 		default = 0,
 		changed = function(val)
