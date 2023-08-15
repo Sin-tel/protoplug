@@ -29,10 +29,8 @@ function stereoFx.Channel:init()
 	self.phase = 0
 	self.upsampler = Upsampler31()
 	self.upsampler2 = Upsampler19()
-	self.upsampler3 = Upsampler11()
 	self.downsampler = Downsampler59()
 	self.downsampler2 = Downsampler31()
-	self.downsampler3 = Downsampler19()
 
 	self.dry_delay = Delayline(32)
 
@@ -74,24 +72,12 @@ function stereoFx.Channel:processBlock(samples, smax)
 		local t1, t2 = self.upsampler2.tick(u1)
 		local t3, t4 = self.upsampler2.tick(u2)
 
-		local s1, s2 = self.upsampler3.tick(t1)
-		local s3, s4 = self.upsampler3.tick(t2)
-		local s5, s6 = self.upsampler3.tick(t3)
-		local s7, s8 = self.upsampler3.tick(t4)
+		t1 = self:tick(t1, w)
+		t2 = self:tick(t2, w)
+		t3 = self:tick(t3, w)
+		t4 = self:tick(t4, w)
 
-		s1 = self:tick(s1, w)
-		s2 = self:tick(s2, w)
-		s3 = self:tick(s3, w)
-		s4 = self:tick(s4, w)
-		s5 = self:tick(s5, w)
-		s6 = self:tick(s6, w)
-		s7 = self:tick(s7, w)
-		s8 = self:tick(s8, w)
-
-		local out = self.downsampler.tick(
-			self.downsampler2.tick(self.downsampler3.tick(s1, s2), self.downsampler3.tick(s3, s4)),
-			self.downsampler2.tick(self.downsampler3.tick(s5, s6), self.downsampler3.tick(s7, s8))
-		)
+		local out = self.downsampler.tick(self.downsampler2.tick(t1, t2), self.downsampler2.tick(t3, t4))
 
 		out = self.post.process(out)
 		out = out * b / a

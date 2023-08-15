@@ -19,11 +19,11 @@ end
 stereoFx.init()
 function stereoFx.Channel:init()
 	self.prev = 0
-	self.high = cbFilter({ type = "hp", f = 10, gain = 0, Q = 0.7 })
+	self.high = cbFilter({ type = "hp", f = 20, gain = 0, Q = 0.7 })
 	self.low = cbFilter({ type = "lp", f = 5, gain = 0, Q = 1.0 })
 
-	self.pre = cbFilter({ type = "tilt", f = 300, gain = 3, Q = 0.4 })
-	self.post = cbFilter({ type = "tilt", f = 300, gain = -3, Q = 0.4 })
+	self.pre = cbFilter({ type = "tilt", f = 100, gain = 3, Q = 0.4 })
+	self.post = cbFilter({ type = "tilt", f = 100, gain = -3, Q = 0.4 })
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
@@ -55,7 +55,7 @@ params = plugin.manageParams({
 	},
 	{
 		name = "drive",
-		min = 0,
+		min = -12,
 		max = 36,
 		changed = function(val)
 			a = math.pow(10, val / 20)
