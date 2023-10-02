@@ -1,16 +1,16 @@
 require("include/protoplug")
-local cbFilter = require("include/dsp/cookbook filters")
 local Line = require("include/dsp/delay_line")
 
 local kap = 0.625
+local balance = 1.0
 
 local max_num = 70
 local l = max_num
-local len = 20
 local feedback = 0
 local coupling = 1
+local master_freq = 1
 
-channels = {}
+local channels = {}
 
 stereoFx.init()
 function stereoFx.Channel:init()
@@ -32,7 +32,7 @@ function stereoFx.Channel:init()
 	self.prev = 0
 end
 
-function randomize()
+local function randomize()
 	for _, v in ipairs(channels) do
 		for i = 1, max_num do
 			v.len[i] = math.random() * 1800 + 100
@@ -41,8 +41,8 @@ function randomize()
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
-	for i = 0, smax do
-		local input = samples[i]
+	for k = 0, smax do
+		local input = samples[k]
 
 		local s = input
 
@@ -75,17 +75,11 @@ function stereoFx.Channel:processBlock(samples, smax)
 		self.last = s
 		local signal = tot
 
-		samples[i] = input * (1.0 - balance) + signal * balance
+		samples[k] = input * (1.0 - balance) + signal * balance
 	end
 end
 
-local function updateFilters(filters, args)
-	for _, f in pairs(filters) do
-		f.update(args)
-	end
-end
-
-params = plugin.manageParams({
+local params = plugin.manageParams({
 	{
 		name = "Dry/Wet",
 		min = 0,

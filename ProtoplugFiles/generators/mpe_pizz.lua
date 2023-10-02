@@ -1,18 +1,27 @@
 require("include/protoplug")
 
-attack = 0.005
-release = 0.005
+local decay = 0.005
+local release = 0.005
 
 polyGen.initTracks(15)
 
-pedal = false
+local pedal = false
 
-TWOPI = 2 * math.pi
+local TWOPI = 2 * math.pi
 
 local freq = 6 * TWOPI / 44100
 
+local VEL_MIN = 0.02
+local LOG_RANGE = -math.log(VEL_MIN)
+
+local function velocity_curve(x)
+    local v = x ^ 0.8
+    local out = VEL_MIN * math.exp(LOG_RANGE * v)
+    return out
+end
+
 function newChannel()
-    new = {}
+    local new = {}
 
     new.pressure = 0
 
@@ -26,7 +35,7 @@ function newChannel()
     return new
 end
 
-channels = {}
+local channels = {}
 
 for i = 1, 16 do
     channels[i] = newChannel()
@@ -40,7 +49,7 @@ function polyGen.VTrack:init()
     self.channel = 0
 
     self.f_ = 0
-    self.pres_ = 0
+    self.envelope = 0
 
     self.noise = 0
     self.noise2 = 0
@@ -82,13 +91,11 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 
     if ch then
         for i = 0, smax do
-            local a = attack
-            if self.pres_ > ch.pressure then
-                a = release
+            if pedal then
+                self.envelope = self.envelope * (1 - decay)
+            else
+                self.envelope = self.envelope * (1 - self.env_decay)
             end
-            --self.pres_ = self.pres_ - (self.pres_ - maxpres)*a
-
-            self.pres_ = self.pres_ * (1 - release)
 
             --self.f_ = self.f_ - (self.f_ - ch.f)*0.002
 
@@ -98,25 +105,18 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
             self.f_ = self.f_ + freq * self.fv
 
             local nse2 = math.random() - 0.5
-
             self.noise2 = self.noise2 - (self.noise2 - nse2) * 0.004
 
-            local addn = self.pres_ * self.pres_ * self.f_
-
             local nse = math.random() - 0.5
-
             self.noise = self.noise - (self.noise - nse) * 0.2
 
+            local addn = self.envelope * self.envelope * self.f_
+
             self.phase = self.phase + (self.f_ * TWOPI) + nse * 0.4 * addn + self.noise2 * 0.1 * self.f_
-
-            local out = math.sin(self.phase + self.fdbck * self.pres_ + self.noise * 0.1)
-
-            --self.phase = self.phase + (self.f_*TWOPI)
-            --local out = math.sin(self.phase +  self.fdbck*(self.pres_*0.5+0.8))
+            local out = math.sin(self.phase + self.fdbck * self.envelope)
 
             self.fdbck = out
-
-            local samp = out * self.pres_
+            local samp = out * self.envelope
 
             samples[0][i] = samples[0][i] + samp * 0.5 -- left
             samples[1][i] = samples[1][i] + samp * 0.5 -- right
@@ -129,42 +129,16 @@ function polyGen.VTrack:noteOff(note, ev)
     local ch = channels[i]
     print(i, "off")
     ch.pressure = 0
-
-    --[[local maxpres = 0
-    local maxi = 0
-        
-    for j =1,16 do
-        local p = channels[j].pressure
-        if p > maxpres then
-            maxpres = p
-            maxi = j
-                
-        end    
-    end
-    
-    if maxpres > 0.01 then
-        self.channel = maxi
-        self.f_ = channels[maxi].f
-        print(self.channel, "active")
-    end]]
+    self.env_decay = release
 end
 
 function polyGen.VTrack:noteOn(note, vel, ev)
     local i = ev:getChannel()
-    --activech = i
     print(i, "on")
 
-    local assignNew = true
-    for j = 1, polyGen.VTrack.numTracks do
-        local vt = polyGen.VTrack.tracks[j]
-        if vt.channel == i then
-            assignNew = false
-        end
-    end
-
-    --if assignNew then
     self.channel = i
-    --end
+    self.phase = 0
+    self.fdbck = 0
 
     local ch = channels[i]
 
@@ -173,9 +147,14 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     ch.pressure = 0
 
     setPitch(ch)
+    self.env_decay = decay
     self.f_ = ch.f
 
-    self.pres_ = vel / 127
+    local v = velocity_curve(vel / 127)
+
+    local ktrack = 1 - note / 127
+
+    self.envelope = v * ktrack
 end
 
 function getFreq(note)
@@ -188,16 +167,17 @@ params = plugin.manageParams({
     -- automatable VST/AU parameters
     -- note the new 1.3 way of declaring them
     {
-        name = "Attack",
+        name = "decay",
         min = 4,
-        max = 10,
+        max = 12,
         default = 5,
         changed = function(val)
-            attack = math.exp(-val)
+            decay = math.exp(-val)
         end,
     },
+
     {
-        name = "Release",
+        name = "release",
         min = 4,
         max = 12,
         default = 5,
