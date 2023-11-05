@@ -1,14 +1,14 @@
 require("include/protoplug")
 local cbFilter = require("include/dsp/cookbook_svf")
 
-attack = 0.005
-release = 0.005
-
 polyGen.initTracks(4)
 
-pedal = false
+local attack = 0.005
+local release = 0.005
 
-TWOPI = 2 * math.pi
+local pedal = false
+
+local TWOPI = 2 * math.pi
 
 local size = 25
 local sparse = 0.2
@@ -50,8 +50,8 @@ local function softclip(x)
     return s * (27.0 + s * s) / (27.0 + 9.0 * s * s)
 end
 
-function newChannel()
-    new = {}
+local function newChannel()
+    local new = {}
 
     new.pressure = 0
 
@@ -65,13 +65,18 @@ function newChannel()
     return new
 end
 
-channels = {}
+local channels = {}
 
 for i = 1, 16 do
     channels[i] = newChannel()
 end
 
-function setPitch(ch)
+local function getFreq(note)
+    local f = 2 ^ ((note + pitch_offset) / 12) * 261.625565
+    return f / 44100
+end
+
+local function setPitch(ch)
     ch.f = getFreq(ch.pitch + ch.pitchbend)
 end
 
@@ -117,10 +122,6 @@ function processMidi(msg)
             channels[ch].pressure = curve(msg:getPressure() / 127)
         end
     end
-end
-
-function sign(number)
-    return number > 0 and 1 or (number == 0 and 0 or -1)
 end
 
 function polyGen.VTrack:addProcessBlock(samples, smax)
@@ -204,11 +205,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 
     setPitch(ch)
     vtrack.f_ = ch.f
-end
-
-function getFreq(note)
-    local f = 2 ^ ((note + pitch_offset) / 12) * 261.625565
-    return f / 44100
 end
 
 params = plugin.manageParams({

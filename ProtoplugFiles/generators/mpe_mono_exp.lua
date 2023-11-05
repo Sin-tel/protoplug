@@ -1,38 +1,41 @@
 require("include/protoplug")
 
-attack = 0.005
-release = 0.005
+local attack = 0.005
+local release = 0.005
 
 polyGen.initTracks(1)
 
-pedal = false
+local pedal = false
 
-TWOPI = 2 * math.pi
-
+local TWOPI = 2 * math.pi
 local freq = 6 * TWOPI / 44100
 
-function newChannel()
-    new = {}
+local function newChannel()
+    local new = {}
 
     new.pressure = 0
-
     new.phase = 0
     new.f = 0
     new.pitch = 0
     new.pitchbend = 0
-
     new.vel = 0
 
     return new
 end
 
-channels = {}
+local channels = {}
 
 for i = 1, 16 do
     channels[i] = newChannel()
 end
 
-function setPitch(ch)
+local function getFreq(note)
+    local n = note - 69
+    local f = 440 * 2 ^ (n / 12)
+    return f / 44100
+end
+
+local function setPitch(ch)
     ch.f = getFreq(ch.pitch + ch.pitchbend)
 end
 
@@ -193,12 +196,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 
     self.vel = vel / 127
     self.t = 0
-end
-
-function getFreq(note)
-    local n = note - 69
-    local f = 440 * 2 ^ (n / 12)
-    return f / 44100
 end
 
 params = plugin.manageParams({

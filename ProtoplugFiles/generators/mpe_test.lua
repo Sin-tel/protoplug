@@ -5,12 +5,12 @@ local release = 0.005
 
 polyGen.initTracks(8)
 
-pedal = false
+local pedal = false
 
 local TWOPI = 2 * math.pi
 
-function newChannel()
-    new = {}
+local function newChannel()
+    local new = {}
     new.pressure = 0
     new.phase = 0
     new.pitch = 0
@@ -20,7 +20,12 @@ function newChannel()
     return new
 end
 
-channels = {}
+local function getFreq(note)
+    local f = 440 * 2 ^ ((note - 69) / 12)
+    return f / 44100
+end
+
+local channels = {}
 
 for i = 1, 16 do
     channels[i] = newChannel()
@@ -124,11 +129,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     ch.pressure = 0
 
     self.pitch = ch.pitch + ch.pitchbend
-end
-
-function getFreq(note)
-    local f = 440 * 2 ^ ((note - 69) / 12)
-    return f / 44100
 end
 
 params = plugin.manageParams({

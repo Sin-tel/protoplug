@@ -25,6 +25,12 @@ local tun_o = 0
 
 local dt = 0.001
 
+local function getFreq(note)
+	local n = note - 69
+	local f = 440 * 2 ^ (n / 12)
+	return f / 44100
+end
+
 function polyGen.VTrack:init()
 	-- create per-track fields here
 
@@ -213,18 +219,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	self.hammer_d = 200 * self.f --math.pow(0.9,0.05/self.f)
 
 	print(self.hammer_d)
-end
-
-function getFreq(note)
-	local n = note - 69
-	local f = 440 * 2 ^ (n / 12)
-	return f / 44100
-end
-
-function getBellFreq(note)
-	local n = note - 69
-	local f = 1200 * 2 ^ (n / 34)
-	return f / 44100
 end
 
 params = plugin.manageParams({

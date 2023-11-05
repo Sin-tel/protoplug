@@ -10,6 +10,20 @@ require("include/protoplug")
 local chordStructure = { 0, 3, 5, 7, 11 }
 local blockEvents = {}
 
+local function chordOn(root)
+	for _, offset in ipairs(chordStructure) do
+		local newEv = midi.Event.noteOn(root:getChannel(), root:getNote() + offset, root:getVel())
+		table.insert(blockEvents, newEv)
+	end
+end
+
+local function chordOff(root)
+	for _, offset in ipairs(chordStructure) do
+		local newEv = midi.Event.noteOff(root:getChannel(), root:getNote() + offset)
+		table.insert(blockEvents, newEv)
+	end
+end
+
 function plugin.processBlock(samples, smax, midiBuf)
 	blockEvents = {}
 	-- analyse midi buffer and prepare a chord for each note
@@ -26,19 +40,5 @@ function plugin.processBlock(samples, smax, midiBuf)
 		for _, e in ipairs(blockEvents) do
 			midiBuf:addEvent(e)
 		end
-	end
-end
-
-function chordOn(root)
-	for _, offset in ipairs(chordStructure) do
-		local newEv = midi.Event.noteOn(root:getChannel(), root:getNote() + offset, root:getVel())
-		table.insert(blockEvents, newEv)
-	end
-end
-
-function chordOff(root)
-	for _, offset in ipairs(chordStructure) do
-		local newEv = midi.Event.noteOff(root:getChannel(), root:getNote() + offset)
-		table.insert(blockEvents, newEv)
 	end
 end

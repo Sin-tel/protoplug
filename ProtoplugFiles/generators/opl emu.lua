@@ -1,6 +1,6 @@
 --[[
 name: sine organ
-description: A simple organ-like sinewave VST/AU. 
+description: A simple organ-like sinewave VST/AU.
 author: osar.fr
 --]]
 
@@ -18,6 +18,30 @@ local quality = false
 local fdbck = 0
 
 polyGen.initTracks(8)
+
+local function logsin(x, a)
+	if quality then
+		return math.sin(x * math.pi * 2) * math.pow(2, a / 256)
+	else
+		x = x % 1
+		x = math.floor(x * 1024)
+		local d = x < 512
+		if not d then
+			x = x - 512
+		end
+		local s = math.floor(256 * (math.log(math.sin((x + 0.5) * (math.pi / (256 * 2)))) / math.log(2)) + 0.5 + a)
+		--print(x)
+
+		local g = math.floor((math.pow(2, s / 256) - 1) * 1024 + 0.5) + 1024
+		if d then
+			return g / 1024
+		else
+			return -g / 1024
+		end
+	end
+
+	--return math.sin(x*2*math.pi)
+end
 
 function polyGen.VTrack:init()
 	-- create per-track fields here
@@ -39,7 +63,6 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 			amp = 1 - self.releasePos * decayRate
 			self.releasePos = self.releasePos + 1
 		end
-		local dt = 1 --1/44100
 		self.phase = self.phase + self.noteFreq
 
 		self.phase = self.phase % 1
@@ -64,30 +87,6 @@ end
 function polyGen.VTrack:noteOn(note, vel, ev)
 	-- start the sinewave at 0 for a clickless attack
 	self.phase = 0
-end
-
-function logsin(x, a)
-	if quality then
-		return math.sin(x * math.pi * 2) * math.pow(2, a / 256)
-	else
-		x = x % 1
-		x = math.floor(x * 1024)
-		local d = x < 512
-		if not d then
-			x = x - 512
-		end
-		local s = math.floor(256 * (math.log(math.sin((x + 0.5) * (math.pi / (256 * 2)))) / math.log(2)) + 0.5 + a)
-		--print(x)
-
-		local g = math.floor((math.pow(2, s / 256) - 1) * 1024 + 0.5) + 1024
-		if d then
-			return g / 1024
-		else
-			return -g / 1024
-		end
-	end
-
-	--return math.sin(x*2*math.pi)
 end
 
 params = plugin.manageParams({

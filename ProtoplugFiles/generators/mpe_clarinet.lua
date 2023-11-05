@@ -18,14 +18,13 @@ local tun_o = 0
 
 polyGen.initTracks(8)
 
-pedal = false
-
-TWOPI = 2 * math.pi
+local pedal = false
+local TWOPI = 2 * math.pi
 
 local freq = 35 * TWOPI / 44100
 
-function newChannel()
-	new = {}
+local function newChannel()
+	local new = {}
 
 	new.pressure = 0
 
@@ -39,13 +38,19 @@ function newChannel()
 	return new
 end
 
-channels = {}
+local channels = {}
 
 for i = 1, 16 do
 	channels[i] = newChannel()
 end
 
-function setPitch(ch)
+local function getFreq(note)
+	local n = note - 69
+	local f = 440 * 2 ^ (n / 12)
+	return f / 44100
+end
+
+local function setPitch(ch)
 	ch.f = getFreq(ch.pitch + ch.pitchbend)
 end
 
@@ -164,7 +169,6 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 			local l2 = (1 - spp) * len
 
 			--[[local spl2 = math.min(10, len*0.5)
-            
             local l1 = len - spl2
             local l2 = spl2]]
 
@@ -208,18 +212,16 @@ function polyGen.VTrack:noteOff(note, ev)
 	print(i, "off")
 	ch.pressure = 0
 
-	local maxpres = 0
-	local maxi = 0
+	-- local maxpres = 0
+	-- local maxi = 0
 
 	--[[ for j =1,16 do
         local p = channels[j].pressure
         if p > maxpres then
             maxpres = p
             maxi = j
-                
-        end    
+        end
     end
-    
     if maxpres > 0.01 then
         self.channel = maxi
         self.f_ = channels[maxi].f
@@ -256,12 +258,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	print(1 / self.f_)
 
 	-- self.pres_ = 0
-end
-
-function getFreq(note)
-	local n = note - 69
-	local f = 440 * 2 ^ (n / 12)
-	return f / 44100
 end
 
 params = plugin.manageParams({

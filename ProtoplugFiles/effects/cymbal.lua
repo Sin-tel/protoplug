@@ -1,7 +1,7 @@
 require("include/protoplug")
-local Line = require("include/dsp/delay_line")
+local Line = require("include/dsp/fdelay_line")
 
-local kap = 0.625
+local k_filter = 0.625
 local balance = 1.0
 
 local max_num = 70
@@ -15,12 +15,11 @@ local channels = {}
 stereoFx.init()
 function stereoFx.Channel:init()
 	table.insert(channels, self)
-	-- create per-channel fields (filters)
-	self.ap = {}
+	self.delays = {}
 	self.len = {}
 	self.filter = {}
 	for i = 1, max_num do
-		self.ap[i] = Line(2000)
+		self.delays[i] = Line(2000)
 
 		self.filter[i] = 0
 
@@ -48,11 +47,18 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		local tot = 0
 
+		local u = -self.prev
+
+		--u = math.max(0, u)
+
+		-- softmax
+		u = u + math.sqrt(u * u + 0.3)
+
 		for i = 1, l do
-			local d = self.ap[i].goBack(self.len[i] * master_freq - math.abs(self.prev))
+			local d = self.delays[i].goBack(self.len[i] * master_freq - u)
 
 			-- one pole lowpass
-			local v = self.filter[i] + (d - self.filter[i]) * kap
+			local v = self.filter[i] + (d - self.filter[i]) * k_filter
 
 			self.filter[i] = v
 
@@ -69,7 +75,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 		for i = 1, l do
 			local v = self.filter[i]
 
-			self.ap[i].push(s + v * f1 - tot * f2)
+			self.delays[i].push(s + v * f1 - tot * f2)
 		end
 
 		self.last = s
@@ -102,7 +108,7 @@ local params = plugin.manageParams({
 		min = 0,
 		max = 1,
 		changed = function(val)
-			kap = 1 - (1 - val) * (1 - val) * (1 - val)
+			k_filter = 1 - (1 - val) * (1 - val) * (1 - val)
 		end,
 	},
 	{
@@ -113,14 +119,6 @@ local params = plugin.manageParams({
 			feedback = 1 - (1 - val) * (1 - val) * (1 - val)
 		end,
 	},
-	-- {
-	-- 	name = "coupling",
-	-- 	min = 0,
-	-- 	max = 1,
-	-- 	changed = function(val)
-	-- 		coupling = val
-	-- 	end,
-	-- },
 	{
 		name = "frequency",
 		min = 0.1,

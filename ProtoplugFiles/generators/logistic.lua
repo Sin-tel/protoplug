@@ -5,9 +5,9 @@ can be used as a noise source
 
 require("include/protoplug")
 
-t = 0
-out = 0.1
-r = 1
+local t = 0
+local out = 0.1
+local r = 1
 
 function plugin.processBlock(s, smax)
 	for i = 0, smax do

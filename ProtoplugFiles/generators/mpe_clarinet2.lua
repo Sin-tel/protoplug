@@ -9,9 +9,6 @@ local cbFilter = require("include/dsp/cookbook filters")
 
 local attack = 0.005
 local release = 0.005
-local kappa = 0
-local split = 0.8
-local mod = 0
 local register = 0
 
 local tun_m = 1
@@ -19,14 +16,14 @@ local tun_o = 0
 
 polyGen.initTracks(8)
 
-pedal = false
+local pedal = false
 
-TWOPI = 2 * math.pi
+local TWOPI = 2 * math.pi
 
 local freq = 4.5 * TWOPI / 44100
 
-function newChannel()
-	new = {}
+local function newChannel()
+	local new = {}
 
 	new.pressure = 0
 
@@ -40,13 +37,19 @@ function newChannel()
 	return new
 end
 
-channels = {}
+local channels = {}
 
 for i = 1, 16 do
 	channels[i] = newChannel()
 end
 
-function setPitch(ch)
+local function getFreq(note)
+	local n = note - 69
+	local f = 440 * 2 ^ (n / 12)
+	return f / 44100
+end
+
+local function setPitch(ch)
 	ch.f = getFreq(ch.pitch + ch.pitchbend)
 end
 
@@ -133,9 +136,7 @@ function processMidi(msg)
 	end
 end
 
---function sign ( val ) return math.max ( math.min ( val * math.huge, 1 ), -1 ) end
-
-function sign(n)
+local function sign(n)
 	return n < 0 and -1 or n > 0 and 1 or 0
 end
 
@@ -188,7 +189,7 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 
 			local boreOut = (1.0 - r) * b1 + r * b2
 
-			local boreOut = -0.85 * boreOut
+			boreOut = -0.85 * boreOut
 
 			local pressure = (1.0 + 0.2 * nse + ch.slide * 0.4 * math.sin(self.phase)) * self.pres_ --+ ch.slide*0.5*math.sin(self.phase)
 
@@ -221,18 +222,16 @@ function polyGen.VTrack:noteOff(note, ev)
 	--print(i, "off")
 	ch.pressure = 0
 
-	local maxpres = 0
-	local maxi = 0
+	-- local maxpres = 0
+	-- local maxi = 0
 
 	--[[ for j =1,16 do
         local p = channels[j].pressure
         if p > maxpres then
             maxpres = p
             maxi = j
-                
-        end    
+        end
     end
-    
     if maxpres > 0.01 then
         self.channel = maxi
         self.f_ = channels[maxi].f
@@ -281,12 +280,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	ch.pressure = 0
 
 	-- self.pres_ = 0
-end
-
-function getFreq(note)
-	local n = note - 69
-	local f = 440 * 2 ^ (n / 12)
-	return f / 44100
 end
 
 params = plugin.manageParams({

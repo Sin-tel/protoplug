@@ -14,20 +14,43 @@ local decayRate = 1 - 1 / decay
 
 local sustain = 0.05
 
-fifth = 6.956 --fifth in semitones
-notes = {}
+local fifth = 6.956 --fifth in semitones
+local notes = {}
 
-center = 0
+local center = 0
 
 polyGen.initTracks(24)
 
-pitchbend = 0
+local pitchbend = 0
 
-pedal = false
+local pedal = false
 
-glob_feedback = 1.0
-glob_brightness = 1.0
-glob_warble = 1.0
+local glob_feedback = 1.0
+local glob_brightness = 1.0
+
+local function getFreq(note)
+	local n = note - 69
+	local f = 440 * 2 ^ (n / 12)
+	return f / 44100
+end
+
+local function temper(note)
+	local index = note % 12
+	local oct = note - index
+
+	local cround = math.floor(center + 0.5)
+
+	local pos = ((index * 7 + 5 - cround) % 12 - 5)
+
+	if pos ~= 6 then
+		center = center + pos * 0.25
+	end
+
+	--print(cround,pos,((pos + cround)*6.95)%12)
+	print(cround, pos, index + (pos + cround) * (fifth - 7))
+
+	return oct + index + (pos + cround) * (fifth - 7)
+end
 
 function polyGen.VTrack:init()
 	-- create per-track fields here
@@ -124,30 +147,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	self.bright = math.min(1.0, 0.005 / self.f)
 
 	--print(0.005/self.f)
-end
-
-function temper(note)
-	local index = note % 12
-	local oct = note - index
-
-	local cround = math.floor(center + 0.5)
-
-	local pos = ((index * 7 + 5 - cround) % 12 - 5)
-
-	if pos ~= 6 then
-		center = center + pos * 0.25
-	end
-
-	--print(cround,pos,((pos + cround)*6.95)%12)
-	print(cround, pos, index + (pos + cround) * (fifth - 7))
-
-	return oct + index + (pos + cround) * (fifth - 7)
-end
-
-function getFreq(note)
-	local n = note - 69
-	local f = 440 * 2 ^ (n / 12)
-	return f / 44100
 end
 
 params = plugin.manageParams({

@@ -13,24 +13,84 @@ local decayRate = 1 - 1 / decay
 
 local sustain = 0.2
 
-fifth = 6.956 --fifth in semitones
-third = 3.86 --third in semitones
-notes = {}
+local fifth = 6.956 --fifth in semitones
+local third = 3.86 --third in semitones
+local notes = {}
 
-names = { "F", "C", "G", "D", "A", "E", "B" }
+local names = { "F", "C", "G", "D", "A", "E", "B" }
 
-cx = 0
-cy = 0
+local cx = 0
+local cy = 0
 
 polyGen.initTracks(24)
 
-pitchbend = 0
+local pitchbend = 0
 
-glob_feedback = 1.0
-glob_brightness = 1.0
-glob_warble = 1.0
+local glob_feedback = 1.0
+local glob_brightness = 1.0
+local glob_warble = 1.0
 
-pedal = false
+local pedal = false
+
+local function getFreq(note)
+	local n = note - 69
+	local f = 440 * 2 ^ (n / 12)
+	return f / 44100
+end
+
+local function temper(note)
+	local index = note % 12
+
+	local x = index * 7 - cx
+	local y = x / 4 - cy
+
+	x = x % 4
+	y = y % 3
+
+	y = y - x * 0.25
+
+	if x > 2.0 then
+		x = x - 4
+		y = y + 1
+	end
+
+	if y > 1.5 then
+		y = y - 3
+	end
+
+	local crx = cx
+	local cry = cy
+
+	cx = cx + x * 0.5
+	cy = cy + y * 0.5
+
+	local px = math.floor(crx + x + 0.5)
+	local py = math.floor(cry + y + 0.5)
+
+	local sharp = math.floor((px + py * 4 + 1) / 7)
+	local comma = py
+
+	local sh = ""
+	if sharp > 0 then
+		sh = string.rep("#", sharp)
+	elseif sharp < 0 then
+		sh = string.rep("b", -sharp)
+	end
+
+	local cm = ""
+	if comma > 0 then
+		cm = string.rep("-", comma)
+	elseif comma < 0 then
+		cm = string.rep("+", -comma)
+	end
+
+	print(names[(px + py * 4 + 1) % 7 + 1] .. sh .. cm)
+	--print(px,py)
+	--print(math.floor((x)*100)/100,math.floor((y)*100)/100)
+	--print(math.floor((cx)*100)/100,math.floor((cy)*100)/100)
+
+	return note + px * (fifth - 7) + py * (third - 4)
+end
 
 function polyGen.VTrack:init()
 	-- create per-track fields here
@@ -131,67 +191,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 
 	--print(0.005/self.f)
 	print(self.bright)
-end
-
-function temper(note)
-	local index = note % 12
-	local oct = note - index
-
-	local x = index * 7 - cx
-	local y = x / 4 - cy
-
-	x = x % 4
-	y = y % 3
-
-	y = y - x * 0.25
-
-	if x > 2.0 then
-		x = x - 4
-		y = y + 1
-	end
-
-	if y > 1.5 then
-		y = y - 3
-	end
-
-	local crx = cx
-	local cry = cy
-
-	cx = cx + x * 0.5
-	cy = cy + y * 0.5
-
-	local px = math.floor(crx + x + 0.5)
-	local py = math.floor(cry + y + 0.5)
-
-	local sharp = math.floor((px + py * 4 + 1) / 7)
-	local comma = py
-
-	local sh = ""
-	if sharp > 0 then
-		sh = string.rep("#", sharp)
-	elseif sharp < 0 then
-		sh = string.rep("b", -sharp)
-	end
-
-	local cm = ""
-	if comma > 0 then
-		cm = string.rep("-", comma)
-	elseif comma < 0 then
-		cm = string.rep("+", -comma)
-	end
-
-	print(names[(px + py * 4 + 1) % 7 + 1] .. sh .. cm)
-	--print(px,py)
-	--print(math.floor((x)*100)/100,math.floor((y)*100)/100)
-	--print(math.floor((cx)*100)/100,math.floor((cy)*100)/100)
-
-	return note + px * (fifth - 7) + py * (third - 4)
-end
-
-function getFreq(note)
-	local n = note - 69
-	local f = 440 * 2 ^ (n / 12)
-	return f / 44100
 end
 
 params = plugin.manageParams({

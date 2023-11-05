@@ -5,10 +5,10 @@ simulated schumann resonances of the atmosphere
 
 require("include/protoplug")
 
-n = 10
-t = 0
-a = 5.54
-phases = {}
+local n = 10
+local t = 0
+local a = 5.54
+local phases = {}
 for i = 1, 1000 do
 	phases[i] = math.random() * 2 * 3.1415
 end
@@ -18,8 +18,8 @@ function plugin.processBlock(s, smax)
 		t = t + a / 44100
 
 		local out = 0
-		for i = 1, n do
-			out = out + math.sin(phases[i] + t * math.sqrt(i * (i + 1))) / i
+		for k = 1, n do
+			out = out + math.sin(phases[k] + t * math.sqrt(k * (k + 1))) / k
 		end
 		out = out
 		s[0][i] = out

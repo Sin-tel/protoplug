@@ -20,7 +20,7 @@ local function velocity_curve(x)
     return out
 end
 
-function newChannel()
+local function newChannel()
     local new = {}
 
     new.pressure = 0
@@ -41,7 +41,13 @@ for i = 1, 16 do
     channels[i] = newChannel()
 end
 
-function setPitch(ch)
+local function getFreq(note)
+    local n = note - 69
+    local f = 440 * 2 ^ (n / 12)
+    return f / 44100
+end
+
+local function setPitch(ch)
     ch.f = getFreq(ch.pitch + ch.pitchbend)
 end
 
@@ -155,12 +161,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     local ktrack = 1 - note / 127
 
     self.envelope = v * ktrack
-end
-
-function getFreq(note)
-    local n = note - 69
-    local f = 440 * 2 ^ (n / 12)
-    return f / 44100
 end
 
 params = plugin.manageParams({
