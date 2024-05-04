@@ -17,7 +17,7 @@ local function Filter(args)
 		params[k] = v
 	end
 
-	public = {
+	local public = {
 		update = function(args)
 			args = args or {}
 			for k, v in pairs(args) do
@@ -30,7 +30,9 @@ local function Filter(args)
 
 			sample_rate = plugin.getSampleRate()
 
-			local g = math.tan(math.pi * params.f / sample_rate)
+			local ff = params.f / sample_rate
+			ff = math.min(ff, 0.49)
+			local g = math.tan(math.pi * ff)
 			local k = 1.0 / params.Q
 			local a = math.pow(10, params.gain / 40)
 			if params.type == "lp" then

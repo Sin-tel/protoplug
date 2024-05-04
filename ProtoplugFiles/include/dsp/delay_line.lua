@@ -4,7 +4,7 @@ local function blend(a, b, p)
 	return (a * p + b * (1 - p))
 end
 
-function Line(bufSize)
+local function Line(bufSize)
 	local n, e = math.frexp(bufSize)
 	bufSize = 2 ^ e --nextpoweroftwo
 	local buf = ffi.new("double[?]", bufSize)
