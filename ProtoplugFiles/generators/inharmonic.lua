@@ -16,10 +16,12 @@ local bloom = 0.0
 local rattle = 0.0
 
 local feedback = 0.0
+local fb_sign = 1.0
 
 local k_filter = 0.0
 local hammer_stiffness = 1.0
 local hammer_filter = 1.0
+local hammer_noise = 0.2
 
 local len_offset = { 1.0, 1.0, 1.0, 1.0 }
 
@@ -34,7 +36,8 @@ function polyGen.VTrack:init()
 	self.prev = 0.0
 	self.len_base = 100.0
 	self.feedback = 0.0
-	self.lp = Filter({ type = "lp", f = 1000, Q = 0.7, gain = -0.1 })
+	self.lp = Filter({ type = "lp", f = 1000, Q = 0.7 })
+	self.hp = Filter({ type = "hp", f = 20, Q = 0.7 })
 	self.k_filter = 0.0
 	self.delays = {}
 	self.filter = {}
@@ -58,10 +61,12 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 		if self.hammer < 1.0 then
 			self.hammer = self.hammer + self.hammer_f
 			s = math.sin(math.pi * self.hammer) * self.vel
-			s = s * (1.0 + 0.1 * math.random())
+
+			s = s * ((1.0 - hammer_noise) + hammer_noise * (math.random() - 0.5))
 		end
 
 		s = self.lp.process(s)
+		s = self.hp.process(s)
 
 		local tot = 0
 
@@ -93,7 +98,8 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 
 		for k = 1, n_lines do
 			local v = self.filter[k]
-			self.delays[k].push(s + v * f1 - tot * f2)
+			local sd = s + v * f1 - tot * f2
+			self.delays[k].push(fb_sign * sd)
 		end
 
 		local out_s = tot
@@ -127,7 +133,7 @@ end
 params = plugin.manageParams({
 	{
 		name = "decay",
-		min = 0,
+		min = 0.7,
 		max = 1,
 		changed = function(val)
 			feedback = 1 - (1 - val) * (1 - val) * (1 - val)
@@ -147,6 +153,14 @@ params = plugin.manageParams({
 		max = 2,
 		changed = function(val)
 			hammer_stiffness = val
+		end,
+	},
+	{
+		name = "hammer noise",
+		min = 0,
+		max = 1,
+		changed = function(val)
+			hammer_noise = val
 		end,
 	},
 	{
@@ -195,6 +209,17 @@ params = plugin.manageParams({
 		max = 4,
 		changed = function(val)
 			len_offset[4] = 1 / val
+		end,
+	},
+	{
+		name = "open/close",
+		min = 0,
+		max = 1,
+		changed = function(val)
+			fb_sign = -1.0
+			if val < 0.5 then
+				fb_sign = 1.0
+			end
 		end,
 	},
 })
