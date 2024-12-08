@@ -6,6 +6,11 @@ local size = 12
 
 local sparse = 150 / (size * size)
 
+local gain_in = 1.0
+local gain = 1.0
+local bias = 0.0
+local f = 1.0
+
 print(sparse)
 
 local w_type = ffi.typeof("double[$][$]", size + 1, size + 1)
@@ -37,11 +42,11 @@ function stereoFx.Channel:init()
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
-	for i = 0, smax do
+	for k = 0, smax do
 		self.gain = self.gain - (self.gain - gain) * 0.001
 		self.bias = self.bias - (self.bias - bias) * 0.001
 
-		local s = samples[i]
+		local s = samples[k]
 
 		for i = 1, size do
 			self.a_new[i] = w_in[i] * s * gain_in + self.bias * w_bias[i]
@@ -59,7 +64,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 			out = out + w_out[i] * y
 		end
 
-		samples[i] = 2 * out / size
+		samples[k] = 2 * out / size
 	end
 end
 
@@ -116,7 +121,7 @@ params = plugin.manageParams({
 				for j = 1, size do
 					w[i][j] = 0
 					if math.random() < sparse then
-						local idx = i + j * size + val
+						-- local idx = i + j * size + val
 						w[i][j] = math.random() - 0.5
 					end
 				end

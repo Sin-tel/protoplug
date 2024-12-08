@@ -41,12 +41,14 @@ end
 local arr = ffi.new("double[?]", size + 1)
 local a_new = ffi.new("double[?]", size + 1)
 local gain = 0
+local gain_ = 0
 local bias = 0
+local bias_ = 0
 local freq = 0.5
 local freq_ = 0
 
 function plugin.processBlock(samples, smax)
-	for i = 0, smax do
+	for k = 0, smax do
 		gain = gain - (gain - gain_) * 0.001
 		bias = bias - (bias - bias_) * 0.001
 		freq = freq - (freq - freq_) * 0.001
@@ -70,8 +72,8 @@ function plugin.processBlock(samples, smax)
 		out = 2 * out / size
 		out = high.process(out)
 
-		samples[0][i] = out
-		samples[1][i] = out
+		samples[0][k] = out
+		samples[1][k] = out
 	end
 end
 

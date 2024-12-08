@@ -74,6 +74,12 @@ function polyGen.VTrack:init()
 	})
 end
 
+local function getFreq(note)
+	local n = note - 69
+	local f = 440 * 2 ^ (n / 12)
+	return f / 44100
+end
+
 function processMidi(msg)
 	if msg:isPitchBend() then
 		local p = msg:getPitchBendValue()
@@ -139,7 +145,6 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 		if self.finished and not pedal then
 			--damp = release
 			right = nr * self.release
-		else
 		end
 		self.delayL.push(right * damp - hf)
 		self.delayR.push(left * damp - hf)
@@ -199,18 +204,6 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	--print(v)
 
 	--print(0.005/self.f)
-end
-
-function getFreq(note)
-	local n = note - 69
-	local f = 440 * 2 ^ (n / 12)
-	return f / 44100
-end
-
-function getBellFreq(note)
-	local n = note - 69
-	local f = 1200 * 2 ^ (n / 34)
-	return f / 44100
 end
 
 params = plugin.manageParams({

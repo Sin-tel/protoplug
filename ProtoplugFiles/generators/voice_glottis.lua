@@ -1,5 +1,7 @@
 require("include/protoplug")
 
+local Filter = require("include/dsp/cookbook_svf")
+
 local attack = 0.005
 local release = 0.005
 
@@ -7,10 +9,12 @@ polyGen.initTracks(1)
 
 local pedal = false
 
-local k = 0
-
 local TWOPI = 2 * math.pi
 local freq = 7 * TWOPI / 44100
+
+local tenseness = 0
+local jitter = 0
+local shimmer = 0
 
 local function newChannel()
     local new = {}
@@ -46,6 +50,7 @@ function polyGen.VTrack:init()
 
     self.f_ = 1
     self.pres_ = 0
+    self.g_prev = 0
 
     self.noise = 0
     self.noise2 = 0
@@ -57,6 +62,11 @@ function polyGen.VTrack:init()
 
     self.t = 10
     self.vel = 0
+
+    self.t_jitter = 1.0
+    self.t_shimmer = 1.0
+
+    self.noise_filter = Filter({ type = "bp", f = 1200, Q = 0.4 })
 end
 
 function processMidi(msg)
@@ -109,43 +119,61 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
             end
             self.pres_ = self.pres_ - (self.pres_ - maxpres) * a
 
-            -- self.f_ = self.f_ - (self.f_ - ch.f)*0.002
             self.t = self.t + 1 / 44100
 
+            -- frequency spring
             local fa = ch.f - self.f_
-            self.fv = self.fv + freq * (fa - 0.6 * self.fv)
-            local s_a = 0.9
+            self.fv = self.fv + freq * (fa - 0.8 * self.fv)
+            local s_a = 0.3
             self.fv = math.tanh(self.fv * s_a / self.f_) * (self.f_ / s_a)
             self.f_ = self.f_ + freq * self.fv
 
-            local nse2 = math.random() - 0.5
+            -- phase update
+            local drop = 1.0 - 0.01 * (1.0 - self.pres_) ^ 2
+            local pf = self.f_ * drop
+            self.phase = self.phase + pf * self.t_jitter
+            if self.phase > 1.0 then
+                self.phase = self.phase - 1.0
+                self.t_jitter = math.exp(0.02 * jitter * (math.random() - 0.5))
+                self.t_shimmer = 1.0 - 0.06 * shimmer * math.random()
+            end
 
-            self.noise2 = self.noise2 - (self.noise2 - nse2) * 0.01
-
-            --local p = math.exp(1-k*self.t)*k*self.t*self.vel
-            -- local p = math.exp(-k * self.t) * (1 - math.exp(-10 * k * self.t)) * self.vel
-            -- p = math.max(p, self.pres_)
+            -- glottis sim
             local p = self.pres_
 
-            local addn = self.pres_ * self.pres_ * self.f_
+            local tense = p * tenseness
+            -- local tense = tenseness
 
-            local nse = math.random() - 0.5
+            local s = 0.888 + 0.1 * tense
+            local t_p = 0.7 - 0.2 * tense
+            local t_mid = s * t_p
+            local u = s * s * s * (1 - s)
+            local b = s * s * (4 * s - 3) / (3 * u * t_p)
+            local t_end = t_mid + 1 / b
 
-            self.noise = self.noise - (self.noise - nse) * 0.2
+            local g = 0
+            if self.phase < t_mid then
+                -- open phase
+                local x = self.phase / t_p
+                g = x * x * x * (1 - x)
+            elseif self.phase < t_end then
+                -- return closing
+                local x = 1 - b * (self.phase - t_mid)
+                g = u * x * x * x
+            end
 
-            self.phase = self.phase + (self.f_ * TWOPI) + nse * 0.4 * addn + self.noise2 * 0.5 * self.f_
+            local dg = (g - self.g_prev) / self.f_
+            self.g_prev = g
+            dg = dg * self.t_shimmer
 
-            local out = math.sin(self.phase + self.fdbck * (p * 0.6 + 0.5) + self.noise * 0.03)
+            local asp = math.random() - 0.5
+            asp = asp * (dg + 0.5 * (1 - tense) ^ 2)
+            asp = self.noise_filter.process(asp)
 
-            --self.phase = self.phase + (self.f_*TWOPI)
-            --local out = math.sin(self.phase +  self.fdbck*(self.pres_*0.5+0.8))
+            local out = (dg + 0.2 * asp) * p
 
-            self.fdbck = out
-
-            local samp = out * p
-
-            samples[0][i] = samples[0][i] + samp * 0.5 -- left
-            samples[1][i] = samples[1][i] + samp * 0.5 -- right
+            samples[0][i] = samples[0][i] + out * 0.1 -- left
+            samples[1][i] = samples[1][i] + out * 0.1 -- right
         end
     end
 end
@@ -237,12 +265,30 @@ params = plugin.manageParams({
         end,
     },
     {
-        name = "Transient",
-        min = 5,
-        max = 50,
-        default = 5,
+        name = "Max Tense",
+        min = 0,
+        max = 1,
+        default = 0.5,
         changed = function(val)
-            k = val
+            tenseness = val
+        end,
+    },
+    {
+        name = "Jitter",
+        min = 0,
+        max = 1,
+        default = 0.5,
+        changed = function(val)
+            jitter = val
+        end,
+    },
+    {
+        name = "Shimmer",
+        min = 0,
+        max = 1,
+        default = 0.5,
+        changed = function(val)
+            shimmer = val
         end,
     },
 })

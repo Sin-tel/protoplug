@@ -36,7 +36,7 @@ local function Filter(args)
 		params[k] = v
 	end
 
-	public = {
+	local public = {
 		update = function(args)
 			args = args or {}
 			for k, v in pairs(args) do

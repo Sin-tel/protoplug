@@ -8,15 +8,13 @@ local Filter = require("include/dsp/cookbook_svf")
 
 polyGen.initTracks(8)
 
-local n_lines = 4
+local n_lines = 2
 
 local pedal = false
 
-local bloom = 0.0
-local rattle = 0.0
+local angle = 0
 
 local feedback = 0.0
-local fb_sign = 1.0
 
 local k_filter = 0.0
 local hammer_stiffness = 1.0
@@ -33,6 +31,7 @@ end
 
 function polyGen.VTrack:init()
 	self.hammer = 1.0
+	self.hammer_f = 0.0
 	self.prev = 0.0
 	self.len_base = 100.0
 	self.feedback = 0.0
@@ -58,26 +57,21 @@ end
 function polyGen.VTrack:addProcessBlock(samples, smax)
 	for i = 0, smax do
 		local s = 0
+		self.hammer = self.hammer + self.hammer_f
 		if self.hammer < 1.0 then
-			self.hammer = self.hammer + self.hammer_f
-			s = (math.sin(math.pi * self.hammer) ^ 2) * self.vel
-
+			s = (math.sin(math.pi * self.hammer)) * self.vel
 			s = s * ((1.0 - hammer_noise) + hammer_noise * (math.random() - 0.5))
 		end
 
-		s = self.lp.process(s)
-		s = self.hp.process(s)
+		-- s = self.lp.process(s)
+		-- s = self.hp.process(s)
+
+		s = s * 2 - self.hammer * 0.00001
 
 		local tot = 0
 
-		local u = -self.prev
-		-- u = u + math.sqrt(u * u + 0.3)
-		u = math.abs(u)
-		-- u = math.max(0, u)
-		u = u * bloom * 0.005
-
 		for k = 1, n_lines do
-			local d = self.delays[k].goBack(self.len_base * len_offset[k] * (1.0 - u) - 1.0)
+			local d = self.delays[k].goBack(self.len_base * len_offset[k] - 1.0)
 			-- one pole lowpass
 			local v = self.filter[k] + (d - self.filter[k]) * self.k_filter
 			self.filter[k] = v
@@ -90,19 +84,31 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 		if self.released and not pedal then
 			f1 = self.f_release
 		end
-		local f2 = 2.0 * f1
 
-		if tot < rattle then
-			tot = (tot + rattle) * f1 - rattle
+		s = s + tot
+		if s < 0 then
+			s = 0
 		end
-
-		self.prev = tot
-
-		for k = 1, n_lines do
-			local v = self.filter[k]
-			local sd = s + v * f1 - tot * f2
-			self.delays[k].push(fb_sign * sd)
+		if s > 1 then
+			s = 1
 		end
+		s = s ^ 3
+
+		-- if tot < rattle then
+		-- 	tot = (tot + rattle) * f1 - rattle
+		-- end
+
+		-- local kc = math.cos(angle)
+		-- local ks = math.sin(angle)
+
+		local v1 = self.filter[1]
+		local v2 = self.filter[2]
+		-- local v3 = self.filter[3]
+		-- local v4 = self.filter[4]
+		self.delays[1].push(-v2 * f1 + s)
+		self.delays[2].push(-v1 * f1)
+		-- self.delays[3].push(-v4 * f1 + s)
+		-- self.delays[4].push(-v3 * f1)
 
 		local out_s = tot
 
@@ -177,14 +183,6 @@ params = plugin.manageParams({
 		end,
 	},
 	{
-		name = "bloom",
-		min = 0,
-		max = 1,
-		changed = function(val)
-			bloom = val
-		end,
-	},
-	{
 		name = "rattle",
 		min = 0,
 		max = 1,
@@ -195,36 +193,12 @@ params = plugin.manageParams({
 	{
 		name = "f2",
 		min = 1,
-		max = 4,
+		max = 8,
 		changed = function(val)
+			local f_b = 1.001
 			len_offset[2] = 1 / val
-		end,
-	},
-	{
-		name = "f3",
-		min = 1,
-		max = 4,
-		changed = function(val)
-			len_offset[3] = 1 / val
-		end,
-	},
-	{
-		name = "f4",
-		min = 1,
-		max = 4,
-		changed = function(val)
-			len_offset[4] = 1 / val
-		end,
-	},
-	{
-		name = "open/close",
-		min = 0,
-		max = 1,
-		changed = function(val)
-			fb_sign = -1.0
-			if val < 0.5 then
-				fb_sign = 1.0
-			end
+			len_offset[3] = f_b
+			len_offset[4] = f_b / val
 		end,
 	},
 })

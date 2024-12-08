@@ -1,0 +1,32 @@
+* consonants
+
+p/t/k: 15ms burst, 40-80ms VOT
+b/d/g: 15ms burst, zero VOT
+- shape: add mild constriction, resolves almost immediately
+- synthesize seperately (should it even pass through tract?)
+
+s: enveloped noise 110ms total, 120ms VOT (no overlap)
+z: somewhat shorter 80ms total, 50ms VOT
+ts: stronger initial attack, 80ms total, 70ms VOT
+sh: different filter, 90ms total
+dz: 60 ms total, mild palatalization
+- synthesize seperately
+
+h: 50ms VOT, 100ms total
+f: same, different filter
+- both flat envelope
+
+* glides/semivowels
+
+r/l: 30ms fixed semivowel, 50ms glide 
+
+y: i glide 40ms static, 70ms glide
+palatalization: i glide 70ms
+
+w: 30ms static, 60ms glide
+
+n: 60ms static, 30ms glide
+m: 60ms static, almost no glide
+
+
+make some kind of frame system, 10ms hop size?

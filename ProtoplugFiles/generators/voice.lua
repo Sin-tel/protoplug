@@ -1,5 +1,9 @@
 require("include/protoplug")
 
+local Filter = require("include/dsp/cookbook_svf")
+local coefs = require("effects/lattice_coefs")
+local c_len = #coefs["a"]
+
 local attack = 0.005
 local release = 0.005
 
@@ -7,10 +11,12 @@ polyGen.initTracks(1)
 
 local pedal = false
 
-local k = 0
-
 local TWOPI = 2 * math.pi
 local freq = 7 * TWOPI / 44100
+
+local tenseness = 0
+
+local tract_phones = { "a", "e", "i", "o", "u" }
 
 local function newChannel()
     local new = {}
@@ -46,6 +52,7 @@ function polyGen.VTrack:init()
 
     self.f_ = 1
     self.pres_ = 0
+    self.g_prev = 0
 
     self.noise = 0
     self.noise2 = 0
@@ -57,6 +64,19 @@ function polyGen.VTrack:init()
 
     self.t = 10
     self.vel = 0
+
+    self.noise_filter = Filter({ type = "bp", f = 800, Q = 0.4 })
+
+    self.lf = {}
+    self.lg = {}
+    self.coefs = {}
+    self.coefs_target = {}
+    for i = 0, c_len do
+        self.lf[i] = 0
+        self.lg[i] = 0
+        self.coefs[i] = coefs.a[i]
+        self.coefs_target[i] = coefs.a[i]
+    end
 end
 
 function processMidi(msg)
@@ -109,43 +129,66 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
             end
             self.pres_ = self.pres_ - (self.pres_ - maxpres) * a
 
-            -- self.f_ = self.f_ - (self.f_ - ch.f)*0.002
             self.t = self.t + 1 / 44100
 
+            -- frequency spring
             local fa = ch.f - self.f_
             self.fv = self.fv + freq * (fa - 0.6 * self.fv)
             local s_a = 0.9
             self.fv = math.tanh(self.fv * s_a / self.f_) * (self.f_ / s_a)
             self.f_ = self.f_ + freq * self.fv
 
+            -- phase update
             local nse2 = math.random() - 0.5
-
             self.noise2 = self.noise2 - (self.noise2 - nse2) * 0.01
+            self.phase = self.phase + self.f_ * (1 + 0.05 * self.noise2)
+            self.phase = self.phase % 1
 
-            --local p = math.exp(1-k*self.t)*k*self.t*self.vel
-            -- local p = math.exp(-k * self.t) * (1 - math.exp(-10 * k * self.t)) * self.vel
-            -- p = math.max(p, self.pres_)
+            -- glottis sim
             local p = self.pres_
 
-            local addn = self.pres_ * self.pres_ * self.f_
+            local tense = p * tenseness
 
-            local nse = math.random() - 0.5
+            local s = 0.888 + 0.1 * tense
+            local t_p = 0.7 - 0.2 * tense
+            local t_mid = s * t_p
+            local u = s * s * s * (1 - s)
+            local b = s * s * (4 * s - 3) / (3 * u * t_p)
+            local t_end = t_mid + 1 / b
 
-            self.noise = self.noise - (self.noise - nse) * 0.2
+            local g = 0
+            if self.phase < t_mid then
+                -- open phase
+                local x = self.phase / t_p
+                g = x * x * x * (1 - x)
+            elseif self.phase < t_end then
+                -- return closing
+                local x = 1 - b * (self.phase - t_mid)
+                g = u * x * x * x
+            end
 
-            self.phase = self.phase + (self.f_ * TWOPI) + nse * 0.4 * addn + self.noise2 * 0.5 * self.f_
+            local dg = (g - self.g_prev) / self.f_
+            self.g_prev = g
 
-            local out = math.sin(self.phase + self.fdbck * (p * 0.6 + 0.5) + self.noise * 0.03)
+            local asp = math.random() - 0.5
+            asp = asp * (dg + 0.5 * (1 - tense))
+            asp = self.noise_filter.process(asp)
 
-            --self.phase = self.phase + (self.f_*TWOPI)
-            --local out = math.sin(self.phase +  self.fdbck*(self.pres_*0.5+0.8))
+            local pre_vt = (dg + 0.2 * asp) * p
 
-            self.fdbck = out
+            -- vocal tract lattice filter
+            self.lf[c_len] = pre_vt
+            for m = c_len, 1, -1 do
+                local k = self.coefs[m]
+                self.coefs[m] = self.coefs[m] - (self.coefs[m] - self.coefs_target[m]) * 0.0001
+                self.lf[m - 1] = self.lf[m] - k * self.lg[m - 1]
+                self.lg[m] = k * self.lf[m - 1] + self.lg[m - 1]
+            end
+            local out = self.lf[0]
+            self.lg[0] = out
 
-            local samp = out * p
-
-            samples[0][i] = samples[0][i] + samp * 0.5 -- left
-            samples[1][i] = samples[1][i] + samp * 0.5 -- right
+            samples[0][i] = samples[0][i] + out * 0.1 -- left
+            samples[1][i] = samples[1][i] + out * 0.1 -- right
         end
     end
 end
@@ -171,6 +214,23 @@ function polyGen.VTrack:noteOff(note, ev)
         self.channel = maxi
         -- self.f_ = channels[maxi].f
         print(self.channel, "active")
+    end
+end
+
+function polyGen.VTrack:setCoefs()
+    local k_i = math.random(#tract_phones)
+    local k_target = tract_phones[k_i]
+    local k_start = k_target
+    -- if math.random() < 0.2 then
+    --     k_start = "n"
+    -- end
+
+    if math.random() < 0.2 then
+        k_start = "i"
+    end
+    for i = 1, c_len do
+        self.coefs_target[i] = coefs[k_target][i]
+        self.coefs[i] = 0.5 * (coefs[k_start][i] + coefs[k_target][i])
     end
 end
 
@@ -208,6 +268,7 @@ function polyGen.VTrack:noteOn(note, vel, ev)
     end
 
     if maxpres < 0.01 then
+        self:setCoefs()
         self.f_ = ch.f
     end
 
@@ -237,12 +298,12 @@ params = plugin.manageParams({
         end,
     },
     {
-        name = "Transient",
-        min = 5,
-        max = 50,
-        default = 5,
+        name = "Max Tense",
+        min = 0,
+        max = 1,
+        default = 0.5,
         changed = function(val)
-            k = val
+            tenseness = val
         end,
     },
 })

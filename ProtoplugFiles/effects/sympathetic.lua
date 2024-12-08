@@ -15,6 +15,7 @@ local l = max_num
 local len = 20
 local feedback = 0
 local coupling = 0
+local balance = 0
 
 stereoFx.init()
 function stereoFx.Channel:init()
@@ -23,7 +24,8 @@ function stereoFx.Channel:init()
 	self.len = {}
 	self.filter = {}
 	for i = 1, max_num do
-		local f = 32.70320 * (2 ^ (i / 12))
+		-- local f = 65.40639 * (2 ^ (i / 12))
+		local f = 110.0000 * (2 ^ (i / 12))
 
 		-- 65.40639*(2^(i/12))
 		-- 32.70320*(2^(i/12))
@@ -51,7 +53,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 		local tot = 0
 
 		for i = 1, l do
-			local d = self.ap[i].goBack(self.len[i])
+			local d = self.ap[i].goBack(self.len[i] - 1.0)
 
 			-- one pole lowpass
 			local v = self.filter[i] + (d - self.filter[i]) * kap
@@ -73,7 +75,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 		end
 
 		self.last = s
-		local signal = tot
+		local signal = tot * 0.1
 
 		samples[i] = input * (1.0 - balance) + signal * balance
 	end
