@@ -5,7 +5,7 @@ local a = 0
 local b = 0
 local n = 0
 
-function clip(u)
+local function clip(u)
 	return math.max(-1, math.min(1, u)) - u
 end
 
@@ -17,23 +17,24 @@ end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		local s = samples[i]
+		local s = samples[i] * a
 		local diff = self.prev - s
 		self.prev = s
 
 		local sum = 0
-		for i = 1, n do
-			--local t = (i - 1 + b * math.random()) / n
+		for k = 1, n do
+			-- local t = (k - 1 + b * math.random()) / n
 			local t = b * math.random()
 			local w = s + t * diff
-			sum = sum + clip(w * a)
+			sum = sum + clip(w)
 		end
 
-		sum = sum / n + samples[i]
+		sum = sum / n + s + 0.5 * diff
 
-		out = self.high.process(sum) / a
+		-- local out = self.high.process(sum)
+		local out = sum
 
-		samples[i] = out
+		samples[i] = out / a
 	end
 end
 

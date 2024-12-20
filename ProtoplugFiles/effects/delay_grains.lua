@@ -3,16 +3,27 @@ local Line = require("include/dsp/fdelay_line")
 local cbFilter = require("include/dsp/cookbook filters")
 
 local maxLength = 3 * 44100
-local fadeSpeed = 20 / 44100
+local fade_speed = 2.0
+local grain_len = 0.2
+local random_len = 0.5
 
 local balance = 0.5
 local length = 1
 local feedback = 0
-local speed = 1
 local gain = 1
 
 local lpfilters = {}
 local hpfilters = {}
+
+local function crossfade(x)
+	local x2 = 1 - x
+	local a = x * x2
+	local b = a * (1 + 1.4186 * a)
+	local c = (b + x)
+	local d = (b + x2)
+	return c * c, d * d
+	-- return x, (1.0 - x)
+end
 
 local function softclip(x)
 	if x <= -1 then
@@ -28,12 +39,13 @@ stereoFx.init()
 
 function stereoFx.Channel:init()
 	self.delayline = Line(maxLength)
-	self.length = 0
 	self.ptr1 = 0
 	self.ptr2 = 0
-	self.a1 = 1.0
-	self.a2 = 0.0
-	self.fade = 1
+	self.a = 1.0
+
+	self.even = false
+
+	self.timer = 0
 
 	self.lp = cbFilter({
 		type = "lp",
@@ -53,50 +65,38 @@ end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		self.length = self.length * 0.999 + length * 0.001
-		local l = self.length * 44100
+		self.timer = self.timer + 1 / 44100
 
-		self.ptr1 = self.ptr1 - (speed - 1)
-		self.ptr2 = self.ptr2 - (speed - 1)
+		local fs = fade_speed / (44100 * grain_len)
 
-		if self.fade == 1 then
-			self.a1 = math.min(1.0, self.a1 + fadeSpeed)
-			self.a2 = math.max(0.0, self.a2 - fadeSpeed)
+		if self.even then
+			self.a = math.min(1.0, self.a + fs)
 		else
-			self.a2 = math.min(1.0, self.a2 + fadeSpeed)
-			self.a1 = math.max(0.0, self.a1 - fadeSpeed)
+			self.a = math.max(0.0, self.a - fs)
 		end
 
-		if speed >= 1 then
-			if self.ptr1 < l * 0.5 and self.fade == 1 then
-				self.ptr2 = l * 1.5
-				self.fade = 2
-			end
-			if self.ptr2 < l * 0.5 and self.fade == 2 then
-				self.ptr1 = l * 1.5
-				self.fade = 1
-			end
-		else
-			if self.ptr1 > l * 1.5 and self.fade == 1 then
-				self.ptr2 = l * 0.5
-				self.fade = 2
-			end
-			if self.ptr2 > l * 1.5 and self.fade == 2 then
-				self.ptr1 = l * 0.5
-				self.fade = 1
-			end
-		end
+		if self.timer > grain_len then
+			local l = length * 44100
+			l = l * (1 + random_len * (math.random() - 0.5))
 
-		--self.ptr = self.ptr % maxLength
+			if self.even then
+				self.ptr2 = l
+				self.even = false
+			else
+				self.ptr1 = l
+				self.even = true
+			end
+			self.timer = 0
+		end
 
 		local s = samples[i]
-		local d = self.delayline.goBack(self.ptr1) * self.a1 + self.delayline.goBack(self.ptr2) * self.a2
+
+		local a1, a2 = crossfade(self.a)
+		local d = a1 * self.delayline.goBack(self.ptr1) + a2 * self.delayline.goBack(self.ptr2)
 
 		d = self.lp.process(d)
 		d = self.hp.process(d)
-		if gain > 1 then
-			d = softclip(d * gain) / gain
-		end
+		d = softclip(d * gain) / gain
 
 		local signal = s + d * feedback
 		self.delayline.push(signal)
@@ -112,6 +112,14 @@ end
 
 params = plugin.manageParams({
 	{
+		name = "Dry/Wet",
+		min = 0,
+		max = 1,
+		changed = function(val)
+			balance = val
+		end,
+	},
+	{
 		name = "Length",
 		max = 2,
 		changed = function(val)
@@ -126,29 +134,30 @@ params = plugin.manageParams({
 		end,
 	},
 	{
-		name = "Speed",
-		max = 3,
-		min = -3,
+		name = "Grain length",
+		min = 0.02,
+		max = 1.0,
 		changed = function(val)
-			speed = val
+			grain_len = val
 		end,
 	},
 	{
-		name = "Distort",
-		max = 4,
-		min = 1,
+		name = "Grain randomize",
+		min = 0.0,
+		max = 1.0,
 		changed = function(val)
-			gain = val
+			random_len = val
 		end,
 	},
-	{
-		name = "Dry/Wet",
-		min = 0,
-		max = 1,
-		changed = function(val)
-			balance = val
-		end,
-	},
+	-- {
+	-- 	name = "Distort",
+	-- 	max = 4,
+	-- 	min = 1,
+	-- 	changed = function(val)
+	-- 		gain = val
+	-- 	end,
+	-- },
+
 	{
 		name = "Highpass",
 		min = 0,

@@ -1,7 +1,3 @@
---[[
-limiter with hilbert peak estimation
-]]
-
 require("include/protoplug")
 local hilbert = require("include/dsp/hilbert")
 local cbFilter = require("include/dsp/cookbook filters")
@@ -14,6 +10,11 @@ local maxLength = 88200
 
 local even = 1 / 8
 local odd = 1 / 18
+
+local balance = 0
+local time = 1
+local feedback = 0
+local freq = 0
 
 local function dist(x)
 	return math.tanh(x + 0.2)
