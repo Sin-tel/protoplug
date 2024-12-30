@@ -8,7 +8,8 @@ local TWO_PI = 2.0 * math.pi
 local maxLength = 3 * 44100
 local fade_speed = 2.0
 local grain_len = 0.2
-local random_len = 0.5
+local random_pos = 0.5
+local random_pitch = 0.5
 
 local balance = 0.5
 local length = 1
@@ -17,16 +18,6 @@ local gain = 1
 
 local lpfilters = {}
 local hpfilters = {}
-
-local function crossfade(x)
-	local x2 = 1 - x
-	local a = x * x2
-	local b = a * (1 + 1.4186 * a)
-	local c = (b + x)
-	local d = (b + x2)
-	return c * c, d * d
-	-- return x, (1.0 - x)
-end
 
 local function softclip(x)
 	if x <= -1 then
@@ -46,7 +37,7 @@ function stereoFx.Channel:init()
 	self.grains = {}
 
 	for i = 1, MAX_GRAINS do
-		self.grains = {
+		self.grains[i] = {
 			ptr = 0,
 			w_pos = 0,
 			w_speed = 1,
@@ -78,11 +69,11 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		--trigger grains randomly
 		local r = math.random()
-		if r < 0.0001 then
+		if r < 0.002 then
 			local k
 			-- find available
-			for j in ipairs(self.grains) do
-				if not j.active then
+			for j, v in ipairs(self.grains) do
+				if not v.active then
 					k = j
 					break
 				end
@@ -90,31 +81,43 @@ function stereoFx.Channel:processBlock(samples, smax)
 			-- schedule
 			if k then
 				local g = self.grains[k]
-				g.ptr = length * 44100
+				g.ptr = (length * 44100) * (1 + random_pos * (math.random() - 0.5))
+				g.w_pos = 0.0
 
-				g.speed = 1.0
+				local r_pitch = math.exp(random_pitch * (math.random() - 0.5))
+				g.speed = 1.0 * r_pitch
+				if math.random() < 0.03 then
+					g.speed = g.speed * 2.0
+				end
 
-				local l = (grain_len * 44100) * (1 + random_len * (math.random() - 0.5))
+				local l = grain_len * 44100
 				g.w_speed = 1 / l
 				g.active = true
 			end
 		end
 
+		local env_sq = 0
+
 		--render
 		for _, v in ipairs(self.grains) do
 			if v.active then
 				v.w_pos = v.w_pos + v.w_speed
-				v.ptr = v.ptr + (v.speed - 1.0)
+				v.ptr = v.ptr + (1.0 - v.speed)
 
 				if v.w_pos > 1.0 then
 					v.active = false
 				else
 					-- window
 					local a = 0.5 - 0.5 * math.cos(TWO_PI * v.w_pos)
-					d = d + a * self.delayline.goBack(v.start)
+					d = d + a * self.delayline.goBack(v.ptr)
+					env_sq = env_sq + a * a
 				end
 			end
 		end
+
+		local norm = 1.0 / (math.sqrt(env_sq) + 0.1)
+
+		d = d * norm
 
 		d = self.lp.process(d)
 		d = self.hp.process(d)
@@ -156,10 +159,10 @@ params = plugin.manageParams({
 	},
 	{
 		name = "Grain length",
-		min = 0.02,
+		min = 0.0,
 		max = 1.0,
 		changed = function(val)
-			grain_len = val
+			grain_len = 50 ^ (val - 1)
 		end,
 	},
 	{
@@ -167,7 +170,15 @@ params = plugin.manageParams({
 		min = 0.0,
 		max = 1.0,
 		changed = function(val)
-			random_len = val
+			random_pos = val
+		end,
+	},
+	{
+		name = "Pitch randomize",
+		min = 0.0,
+		max = 1.0,
+		changed = function(val)
+			random_pitch = val * 0.2
 		end,
 	},
 	{

@@ -1,7 +1,7 @@
 require("include/protoplug")
---local Line = require("include/dsp/fdelay_line")
-local Line = require("include/dsp/delay_line")
-local cbFilter = require("include/dsp/cookbook filters")
+local Line = require("include/dsp/fdelay_line")
+-- local Line = require("include/dsp/delay_line")
+local Filter = require("include/dsp/cookbook filters")
 
 local balance = 0.5
 local size = 1
@@ -40,13 +40,6 @@ local ap6_l = 2656
 local ap7_l = 672
 local ap8_l = 1800
 
-local shelf1 = cbFilter({
-	type = "hs",
-	f = 8000,
-	gain = -3,
-	Q = 0.7,
-})
-
 local function allpass(s, ap, l)
 	local d = ap.goBack(l)
 	local v = s - k_ap * d
@@ -54,15 +47,22 @@ local function allpass(s, ap, l)
 	return k_ap * v + d
 end
 
-local function softclip(x)
-	if x <= -1 then
-		return -2.0 / 3.0
-	elseif x >= 1 then
-		return 2.0 / 3.0
-	else
-		return x - (x * x * x) / 3.0
-	end
-end
+-- local shelf1 = Filter({
+-- 	type = "hs",
+-- 	f = 8000,
+-- 	gain = -3,
+-- 	Q = 0.7,
+-- })
+
+-- local function softclip(x)
+-- 	if x <= -1 then
+-- 		return -2.0 / 3.0
+-- 	elseif x >= 1 then
+-- 		return 2.0 / 3.0
+-- 	else
+-- 		return x - (x * x * x) / 3.0
+-- 	end
+-- end
 
 function plugin.processBlock(samples, smax)
 	for i = 0, smax do
@@ -75,35 +75,38 @@ function plugin.processBlock(samples, smax)
 
 		time = time + 1 / 44100
 
-		local mod = math.sin(time * 0.005) * 8.0
+		-- local mod = math.sin(time * 2.5) * 64.0
+		local mod = 1.0 + 0.005 * math.sin(5.35 * time)
+		local mod2 = 1.0 + 0.008 * math.sin(3.12 * time)
 
 		s = allpass(s, ap1, ap1_l)
 		s = allpass(s, ap2, ap2_l)
 		s = allpass(s, ap3, ap3_l)
 		s = allpass(s, ap4, ap4_l)
 
-		local u1 = delay1.goBack(l1 * size)
-		local u2 = delay2.goBack(l2 * size)
-		local u3 = delay3.goBack(l3 * size)
-		local u4 = delay4.goBack(l4 * size)
+		local u1 = delay1.goBack(l1 * size_ * mod)
+		local u2 = delay2.goBack(l2 * size_)
+		local u3 = delay3.goBack(l3 * size_ * mod2)
+		local u4 = delay4.goBack(l4 * size_)
 
 		u4 = u4 + s
 		-- sign?
-		u4 = allpass(u4, ap5, ap5_l + mod)
+		u4 = allpass(u4, ap5, ap5_l)
 		delay1.push(u4)
 
 		-- damping
-		u1 = u1 * feedback
+		u1 = u1
 		u1 = allpass(u1, ap6, ap6_l)
-		delay2.push(u1)
+		delay2.push(u1 * feedback)
 
 		u2 = u2 + s
-		u2 = allpass(u2, ap7, ap7_l + mod)
+		-- u2 = shelf1.process(u2)
+		u2 = allpass(u2, ap7, ap7_l)
+		-- u2 = softclip(u2)
 		delay3.push(u2)
 
-		u3 = u3 * feedback
 		u3 = allpass(u3, ap8, ap8_l)
-		delay4.push(u3)
+		delay4.push(u3 * feedback)
 
 		local sl = u1
 		local sr = u3
@@ -120,7 +123,7 @@ local function setFeedback(t)
 	if t_60 > 15 then
 		feedback = 1.0
 	else
-		feedback = 10 ^ (-(60 * 4000 * size) / (t_60 * 44100 * 20))
+		feedback = 10 ^ (-(60 * 8000 * size) / (t_60 * 44100 * 20))
 	end
 end
 
