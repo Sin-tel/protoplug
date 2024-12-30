@@ -1,6 +1,8 @@
--- boilerplate example
+-- "bandwidth-enhanced additive model" as in loris
+-- https://www.cerlsoundgroup.org/Loris/
 
 require("include/protoplug")
+local Filter = require("include/dsp/cookbook_svf")
 
 polyGen.initTracks(8)
 
@@ -9,19 +11,17 @@ local pedal = false
 
 local release = 0.99
 
-local MAX_HARMONICS = 48
+local MAX_HARMONICS = 16
 
 local falloff = 1.0
 
 local inharm = 0
 
-local phase = 0
-local rand_amp = 0
-local rand_freq = 0
-local rand_freq_amt = 0
 local mult = 0
 local offset = 0
 local pluck = 0
+
+local kappa = 0
 
 local function getFreq(note)
 	local n = note - 69
@@ -43,14 +43,19 @@ function polyGen.VTrack:init()
 	self.c = {}
 	self.s = {}
 	self.a = {}
-	self.harm = {}
-	self.f_random = {}
-	self.a_base = {}
-	self.a_random = {}
-	self.ap = {}
-	self.p = {}
-	self.pc = {}
-	self.ps = {}
+
+	self.k1 = {}
+	self.k2 = {}
+
+	self.noise_filter = {}
+	self.noise_gain = {}
+	for i = 1, MAX_HARMONICS do
+		self.noise_filter[i] = Filter({ type = "lp", f = 80.0, gain = 0, Q = 0.7 })
+		self.noise_gain[i] = 1.0
+
+		self.k1[i] = 1
+		self.k2[i] = 0
+	end
 end
 
 function processMidi(msg)
@@ -92,20 +97,24 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 				self:update_bank()
 				self.counter = 0
 			end
-			local ll = self.counter / 128
+			-- local ll = self.counter / 128
 
-			local sr = 0
+			local sr
 			local sl = 0
 			for i = 1, self.n_harm do
-				local a = (1 - ll) * self.ap[i] + ll * self.a[i]
+				-- local a = (1 - ll) * self.ap[i] + ll * self.a[i]
+				local a = self.a[i]
+
+				-- should really be gaussian
+				local zeta = (math.random() - 0.5) * self.noise_gain[i]
+				zeta = self.noise_filter[i].process(zeta)
 
 				local t0 = self.g0[i] * self.c[i] - self.g1[i] * self.s[i]
 				local t1 = self.g1[i] * self.c[i] + self.g0[i] * self.s[i]
 				self.c[i] = t0
 				self.s[i] = t1
 
-				sl = sl + a * (self.pc[i] * t0 + self.ps[i] * t1)
-				-- sr = sr + self.a[i] * (self.ps[i] * t0 - self.pc[i] * t1)
+				sl = sl + a * (self.k1[i] + self.k2[i] * zeta) * t0
 			end
 
 			sl = sl * self.env * self.vel * 0.3
@@ -123,24 +132,17 @@ end
 
 function polyGen.VTrack:update_bank()
 	for i = 1, MAX_HARMONICS do
+		local fi = (i - 1) * mult + 1
+
 		local ih = 0.01 * inharm
 		fi = fi * math.sqrt(1 + ih * i * i) / math.sqrt(1 + ih)
-		-- fi = fi + inharm * (i - 1) * (i - 1)
-
-		-- local fi = self.harm[i]
 
 		local f = self.f * fi
 
-		-- self.d[i] = math.pow(0.99, 0.01 * pluck * fi)
 		local decay = math.pow(0.99, 0.01 * pluck * i)
-
-		local kf = math.min(1, f * rand_freq)
-		-- local kf = math.min(1, 0.1 * rand_freq)
-		self.f_random[i] = (1 - kf) * self.f_random[i] + kf * (math.random() - 0.5)
 
 		f = f + offset / 44100
 
-		f = f * 2 ^ (rand_freq_amt * self.f_random[i])
 		if f > 0.45 then
 			break
 		end
@@ -154,16 +156,16 @@ function polyGen.VTrack:update_bank()
 		self.g0[i] = self.g0[i] * decay
 		self.g1[i] = self.g1[i] * decay
 
-		-- self.p[i] = self.p[i] + f * phase * (math.random() - 0.5)
-		-- self.p[i] = self.p[i] + 0.01 * phase
+		local f_filter = f * 0.01
+		self.noise_gain[i] = 0.02 / f_filter
+		self.noise_filter[i].update({ f = 44100 * f_filter })
 
-		self.pc[i] = math.cos(self.p[i])
-		self.ps[i] = math.sin(self.p[i])
-		self.ap[i] = self.a[i]
+		local k = 0.1 * kappa * i
 
-		local ka = math.min(1, f * rand_amp)
-		self.a_random[i] = (1 - ka) * self.a_random[i] + ka * math.random() * 2
-		self.a[i] = self.a_base[i] * self.a_random[i]
+		k = math.min(math.max(k, 0.), 1.)
+
+		self.k1[i] = math.sqrt(1.0 - k)
+		self.k2[i] = math.sqrt(2.0 * k)
 	end
 end
 
@@ -183,27 +185,11 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	self.attack = true
 
 	for i = 1, MAX_HARMONICS do
-		self.p[i] = phase * math.random() * 2 * math.pi
+		-- self.p[i] = phase * math.random() * 2 * math.pi
 		self.c[i] = 0.0
 		self.s[i] = 1.0
-		self.a_base[i] = math.pow(i, -falloff)
-		self.a[i] = self.a_base[i]
-		self.ap[i] = self.a_base[i]
-		self.a_random[i] = 1.0
-		self.f_random[i] = 0 -- math.random() - 0.5
-
-		self.harm[i] = math.random() * 48
+		self.a[i] = math.pow(i, -falloff)
 	end
-	self.harm[1] = 1
-	self.harm[2] = 1.01
-	self.harm[3] = 3.995
-	self.harm[4] = 10.02
-	self.harm[5] = 8.1
-	self.harm[6] = 2.3
-	self.harm[7] = 16.3
-	self.harm[20] = 0.2 + 0.2 * math.random()
-	self.harm[24] = 0.2 + 0.2 * math.random()
-	self.harm[28] = 0.2 + 0.2 * math.random()
 
 	self:update_bank()
 end
@@ -269,30 +255,12 @@ params = plugin.manageParams({
 	},
 
 	{
-		name = "random amp",
+		name = "kappa",
 		min = 0,
-		max = 10,
+		max = 1,
 		default = 0,
 		changed = function(val)
-			rand_amp = val
-		end,
-	},
-	{
-		name = "random freq speed",
-		min = 0,
-		max = 10,
-		default = 0,
-		changed = function(val)
-			rand_freq = val
-		end,
-	},
-	{
-		name = "random freq amt",
-		min = 0,
-		max = 0.1,
-		default = 0,
-		changed = function(val)
-			rand_freq_amt = val
+			kappa = val
 		end,
 	},
 })

@@ -25,10 +25,10 @@ local ap2 = Line(2000)
 local ap3 = Line(2000)
 local ap4 = Line(2000)
 
-local ap1_l = 1227
-local ap2_l = 173
-local ap3_l = 1389
-local ap4_l = 1136
+local ap1_l = 142
+local ap2_l = 107
+local ap3_l = 379
+local ap4_l = 277
 
 local hp1 = cbFilter({
 	type = "hp",
@@ -166,10 +166,10 @@ function plugin.processBlock(samples, smax)
 		local s3 = (sl + (d1 + d2 - d3 - d4) * feedback * 0.5)
 		local s4 = (sr + (d1 - d2 - d3 + d4) * feedback * 0.5)
 
-		s1 = allpass(ap1, s1, ap1_l * size_)
-		s2 = allpass(ap2, s2, ap2_l * size_)
-		s3 = allpass(ap3, s3, ap3_l * size_)
-		s4 = allpass(ap4, s4, ap4_l * size_)
+		s1 = allpass(ap1, s1, ap1_l)
+		s2 = allpass(ap2, s2, ap2_l)
+		s3 = allpass(ap3, s3, ap3_l)
+		s4 = allpass(ap4, s4, ap4_l)
 
 		s1 = hp1.process(s1)
 		s2 = hp2.process(s2)
