@@ -1,7 +1,7 @@
 require("include/protoplug")
 
 local Line = require("include/dsp/delay_line")
-local cbFilter = require("include/dsp/cookbook filters")
+local Filter = require("include/dsp/cookbook_svf")
 
 local attack = 0.005
 local release = 0.005
@@ -59,24 +59,21 @@ function polyGen.VTrack:init()
 
 	self.ap = Line(100)
 
-	self.lp = cbFilter({
-		-- initialize filters with current param values
+	self.lp = Filter({
 		type = "lp",
 		f = 3000,
 		gain = 0,
 		Q = 0.7,
 	})
 
-	self.noisefilter = cbFilter({
-		-- initialize filters with current param values
+	self.noisefilter = Filter({
 		type = "bp",
 		f = 2000,
 		gain = 0,
 		Q = 1.0,
 	})
 
-	self.dcblock = cbFilter({
-		-- initialize filters with current param values
+	self.dcblock = Filter({
 		type = "hp",
 		f = 200,
 		gain = 0,

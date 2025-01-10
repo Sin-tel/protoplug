@@ -114,6 +114,11 @@ local function Filter(args)
 			end
 		end,
 
+		reset_state = function()
+			ic1eq = 0
+			ic2eq = 0
+		end,
+
 		process = function(v0)
 			local v3 = v0 - ic2eq
 			local v1 = a1 * ic1eq + a2 * v3
