@@ -8,7 +8,7 @@ local Line = require("include/dsp/fdelay_line")
 local Filter = require("include/dsp/cookbook_svf")
 local ProtoFilter = require("include/dsp/cookbook filters")
 
-polyGen.initTracks(24)
+polyGen.initTracks(2)
 
 local release = 0.99
 local decay = 0.99
@@ -62,6 +62,9 @@ function polyGen.VTrack:init()
 	self.delay[2] = Line(1024)
 	self.delay[3] = Line(1024)
 	self.delay_hammer = Line(1024)
+
+	self.done_timer = 0
+	self.active = false
 
 	self.h_t = 0
 
@@ -136,81 +139,90 @@ end
 local TWO_PI = 2 * math.pi
 
 function polyGen.VTrack:addProcessBlock(samples, smax)
-	for i = 0, smax do
-		local nse = math.random() - 0.5
-		local s = 0
+	if self.active then
+		for i = 0, smax do
+			local nse = math.random() - 0.5
+			local s = 0
 
-		local a = 4
-		local a2 = 4
-		local t = self.hammer_t
-		local t2 = self.hammer_t2
-		local w = 0
-		if t < 1.0 then
-			if t < 1 / a then
-				w = smoothstep(a * t)
-			elseif 1 - (1 / a2) < t then
-				w = smoothstep(a2 * (1 - t))
-			else
-				w = 1.0
+			local a = 4
+			local a2 = 4
+			local t = self.hammer_t
+			local t2 = self.hammer_t2
+			local w = 0
+			if t < 1.0 then
+				if t < 1 / a then
+					w = smoothstep(a * t)
+				elseif 1 - (1 / a2) < t then
+					w = smoothstep(a2 * (1 - t))
+				else
+					w = 1.0
+				end
+
+				for n = 1, n_harm do
+					s = s + math.sin(n * TWO_PI * t2 + self.f_phase[n]) * self.f_weights[n]
+				end
+
+				s = s * w
+				s = s * self.vel
 			end
 
-			for n = 1, n_harm do
-				s = s + math.sin(n * TWO_PI * t2 + self.f_phase[n]) * self.f_weights[n]
+			self.hammer_t = self.hammer_t + self.hammer_f
+			self.hammer_t2 = self.hammer_t2 + self.hammer_f2
+
+			nse = nse * w
+			nse = self.noise_filter.process(nse)
+			nse = self.noise_filter2.process(nse)
+			s = s + nse * 0.2
+
+			s = self.dc_kill.process(s)
+
+			-- local hs1 = self.delay_hammer.goBack(self.len[1] * 0.125)
+			-- local hs2 = self.delay_hammer.goBack(self.len[1] * 0.25)
+			-- self.delay_hammer.push(s)
+			-- s = s - 0.206 * hs1 - 0.427 * hs2
+
+			if self.finished and not pedal then
+				self.decay = 0.99 * self.decay + 0.01 * self.release
+				self.done_timer = self.done_timer + 1 / 44100
+				if self.done_timer > 0.5 then
+					self.active = false
+					break
+				end
+			end
+			local damp = self.decay
+
+			local string_total = 0
+			for k = 1, self.n_delays do
+				local ds = self.delay[k].goBack(self.len[k] * (1 / tun_m) + self.len_corr)
+				ds = ds * damp
+				ds = self.ap[k].process(ds)
+				ds = self.loop_filter[k].process(ds)
+				self.string_s[k] = ds
+				string_total = string_total + ds
+			end
+			string_total = string_total / self.n_delays
+
+			for k = 1, self.n_delays do
+				local ds = self.string_s[k]
+				self.delay[k].push(ds - string_total * 2 * self.coupling + s)
 			end
 
-			s = s * w
-			s = s * self.vel
+			local out = string_total + 0.3 * s
+
+			samples[0][i] = samples[0][i] + out -- left
+			samples[1][i] = samples[1][i] + out -- right
 		end
-
-		self.hammer_t = self.hammer_t + self.hammer_f
-		self.hammer_t2 = self.hammer_t2 + self.hammer_f2
-
-		nse = nse * w
-		nse = self.noise_filter.process(nse)
-		nse = self.noise_filter2.process(nse)
-		s = s + nse * 0.2
-
-		s = self.dc_kill.process(s)
-
-		-- local hs1 = self.delay_hammer.goBack(self.len[1] * 0.125)
-		-- local hs2 = self.delay_hammer.goBack(self.len[1] * 0.25)
-		-- self.delay_hammer.push(s)
-		-- s = s - 0.206 * hs1 - 0.427 * hs2
-
-		if self.finished and not pedal then
-			self.decay = 0.99 * self.decay + 0.01 * self.release
-		end
-		local damp = self.decay
-
-		local string_total = 0
-		for k = 1, self.n_delays do
-			local ds = self.delay[k].goBack(self.len[k] * (1 / tun_m) + self.len_corr)
-			ds = ds * damp
-			ds = self.ap[k].process(ds)
-			ds = self.loop_filter[k].process(ds)
-			self.string_s[k] = ds
-			string_total = string_total + ds
-		end
-		string_total = string_total / self.n_delays
-
-		for k = 1, self.n_delays do
-			local ds = self.string_s[k]
-			self.delay[k].push(ds - string_total * 2 * self.coupling + s)
-		end
-
-		local out = string_total + 0.3 * s
-
-		samples[0][i] = samples[0][i] + out -- left
-		samples[1][i] = samples[1][i] + out -- right
 	end
 end
 
 function polyGen.VTrack:noteOff(note, ev)
 	self.finished = true
+	self.done_timer = 0
 end
 
 function polyGen.VTrack:noteOn(note, vel, ev)
 	self.finished = false
+	self.active = true
 
 	local f = get_freq(note)
 
@@ -346,7 +358,7 @@ params = plugin.manageParams({
 	{
 		name = "release",
 		min = 1.5,
-		max = 4,
+		max = 3,
 		default = 2,
 		changed = function(val)
 			release = 1.0 - math.exp(-val)
