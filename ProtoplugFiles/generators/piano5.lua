@@ -5,7 +5,8 @@ another attempt at piano
 require("include/protoplug")
 
 local Line = require("include/dsp/fdelay_line")
-local cbFilter = require("include/dsp/cookbook_svf")
+local Filter = require("include/dsp/cookbook_svf")
+local ProtoFilter = require("include/dsp/cookbook filters")
 
 polyGen.initTracks(24)
 
@@ -38,6 +39,8 @@ function polyGen.VTrack:init()
 	self.f_weights = {}
 	self.f_phase = {}
 
+	self.len_corr = 0
+
 	self.position = 0.132
 
 	self.integrate = 0
@@ -65,46 +68,45 @@ function polyGen.VTrack:init()
 	self.r = 0.77
 
 	self.ap = {
-		cbFilter({
+		Filter({
 			type = "ap",
 		}),
-		cbFilter({
+		Filter({
 			type = "ap",
 		}),
-		cbFilter({
+		Filter({
 			type = "ap",
 		}),
 	}
+
+	self.ap_proto = ProtoFilter({ type = "ap" })
 
 	self.loop_filter = {
-		cbFilter({
+		Filter({
 			type = "hs",
 		}),
-		cbFilter({
+		Filter({
 			type = "hs",
 		}),
-		cbFilter({
+		Filter({
 			type = "hs",
 		}),
 	}
 
-	self.noise_filter = cbFilter({
+	self.lp_proto = ProtoFilter({ type = "hs" })
+
+	self.noise_filter = Filter({
 		type = "lp",
 		f = 10,
 		Q = 0.7,
 	})
-	self.hammerfilter2 = cbFilter({
-		type = "lp",
-		f = 10,
-		Q = 0.7,
-	})
-	self.hammerfilter3 = cbFilter({
+	self.noise_filter2 = Filter({
 		type = "lp",
 		f = 10,
 		Q = 0.7,
 	})
 
-	self.dc_kill = cbFilter({
+	self.dc_kill = Filter({
 		type = "hp",
 		f = 30,
 		Q = 0.7,
@@ -117,28 +119,6 @@ function processMidi(msg)
 			pedal = msg:getControlValue() ~= 0
 		end
 	end
-end
-
--- C2-C7 offset in cents
-local tun_table = { 95.0, 75.0, 115.0, 213.0, 400.0, 746.0 }
-
-local function get_freq_corr(note)
-	local t = (note / 12) - 2
-	if t <= 1.0 then
-		t = 1.0
-	end
-	if t >= 5.999 then
-		t = 5.999
-	end
-	local t_index = math.floor(t)
-	local t_frac = t - t_index
-
-	local t_c = (1.0 - t_frac) * tun_table[t_index] + t_frac * tun_table[t_index + 1]
-	local f_c = 2 ^ (t_c / 1200)
-
-	local n = note - 69
-	local f = 440 * 2 ^ (n / 12)
-	return (f * f_c / 44100)
 end
 
 local function get_freq(note)
@@ -173,14 +153,10 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 			else
 				w = 1.0
 			end
-			-- s = s + math.cos(1 * TWO_PI * t2)
 
 			for n = 1, n_harm do
 				s = s + math.sin(n * TWO_PI * t2 + self.f_phase[n]) * self.f_weights[n]
 			end
-
-			-- local r = self.r
-			-- s = s + math.sin(TWO_PI * t2) / (1 + r * r + 2 * r * math.cos(TWO_PI * t2))
 
 			s = s * w
 			s = s * self.vel
@@ -191,17 +167,15 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 
 		nse = nse * w
 		nse = self.noise_filter.process(nse)
-		nse = self.hammerfilter2.process(nse)
-
-		-- s = s + nse * 0.2
+		nse = self.noise_filter2.process(nse)
+		s = s + nse * 0.2
 
 		s = self.dc_kill.process(s)
-		-- s = self.hammerfilter3.process(s)
 
-		local hs1 = self.delay_hammer.goBack(self.len[1] * 0.125)
-		local hs2 = self.delay_hammer.goBack(self.len[1] * 0.25)
-		self.delay_hammer.push(s)
-		s = s - 0.206 * hs1 - 0.427 * hs2
+		-- local hs1 = self.delay_hammer.goBack(self.len[1] * 0.125)
+		-- local hs2 = self.delay_hammer.goBack(self.len[1] * 0.25)
+		-- self.delay_hammer.push(s)
+		-- s = s - 0.206 * hs1 - 0.427 * hs2
 
 		if self.finished and not pedal then
 			self.decay = 0.99 * self.decay + 0.01 * self.release
@@ -210,7 +184,7 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 
 		local string_total = 0
 		for k = 1, self.n_delays do
-			local ds = self.delay[k].goBack(self.len[k] * (1 / tun_m) + 1.3)
+			local ds = self.delay[k].goBack(self.len[k] * (1 / tun_m) + self.len_corr)
 			ds = ds * damp
 			ds = self.ap[k].process(ds)
 			ds = self.loop_filter[k].process(ds)
@@ -224,9 +198,7 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 			self.delay[k].push(ds - string_total * 2 * self.coupling + s)
 		end
 
-		-- local out = s
-		-- local out = string_total + s
-		local out = string_total
+		local out = string_total + 0.3 * s
 
 		samples[0][i] = samples[0][i] + out -- left
 		samples[1][i] = samples[1][i] + out -- right
@@ -241,14 +213,13 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	self.finished = false
 
 	local f = get_freq(note)
-	local f_c = get_freq_corr(note)
 
 	self.n_delays = 3
-	self.len[1] = 1.0 / f_c
+	self.len[1] = 1.0 / f
 	local d1 = 0.5 + math.random()
 	local d2 = 0.5 + math.random()
-	self.len[2] = (1.0 + unison_width * 0.00100 * d1) / f_c
-	self.len[3] = (1.0 - unison_width * 0.00163 * d2) / f_c
+	self.len[2] = (1.0 + unison_width * 0.00100 * d1) / f
+	self.len[3] = (1.0 - unison_width * 0.00163 * d2) / f
 
 	local f_alpha = vel / 64
 	local f_i = 1
@@ -258,11 +229,11 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	end
 	if note <= 38 then
 		self.n_delays = 1
-		self.len[1] = 1.0 / f_c
+		self.len[1] = 1.0 / f
 	elseif note <= 50 then
 		self.n_delays = 2
-		self.len[1] = 0.9998 / f_c
-		self.len[2] = 1.0002 / f_c
+		self.len[1] = 0.9998 / f
+		self.len[2] = 1.0002 / f
 	end
 
 	do
@@ -293,9 +264,9 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 				self.f_weights[k] = 0
 			end
 
-			self.f_phase[k] = math.random() * TWO_PI
+			-- self.f_phase[k] = math.random() * TWO_PI
 			-- self.f_phase[k] = math.random() * TWO_PI * 0.1
-			-- self.f_phase[k] = 0
+			self.f_phase[k] = math.pi
 		end
 	end
 
@@ -309,14 +280,9 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	local c_off = 2 ^ (-0.04 * (note - 69))
 	self.coupling = coupling * c_off
 
-	local r_db = 1.8 - 0.25 * (note - 60) + 7 * (vel / 127)
-	self.r = math.tanh(0.1 * r_db)
-	print(r_db, self.r)
-
 	self.position = position
 
 	local h_off = 0.2 / (note / 127)
-	-- local h_off = 0.5
 
 	self.hammer_t = 0.0
 	self.hammer_f = f * h_off
@@ -326,47 +292,44 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	self.hammer_f2 = f
 
 	self.decay = math.pow(decay, 0.001 / f)
-	-- self.decay = 1.0
 	self.release = math.pow(release, 0.003 / f)
 
-	-- local lpo = 3 + v * 10 - (note - 60) / 10
-	local lpo = 1 + v * 20 - (note - 60) / 30
-	-- local lpf = 44100 * f * lpo
-	local lpf = 200 * lpo
-
-	self.hammerfilter3.update({
-		f = lpf * 2,
-		Q = 0.7,
-	})
-
-	-- print(44100 * math.sqrt(f) + v * 4800)
-	-- print(44100 * math.sqrt(f) + v * 4800)
 	local nlpf = 3000 * math.sqrt(f) + v * 2000
 	-- local nlpf = 8000 * math.sqrt(f) + v * 2000
 	self.noise_filter.update({
 		f = nlpf,
 		Q = 0.7,
 	})
-	self.hammerfilter2.update({
+	self.noise_filter2.update({
 		f = nlpf,
 		Q = 0.7,
 	})
 
 	local w = note / 127
 	local apo = 1 / (0.39 - 1.73 * w + 2.23 * w * w)
+	-- local apo = 1 / (0.33 - 1.13 * w + 1.41 * w * w)
 	local apf = 44100 * f * apo
-	local apq = 0.45
+	local apq = 0.5
 	self.ap[1].update({ f = apf, Q = apq })
 	self.ap[2].update({ f = apf, Q = apq })
 	self.ap[3].update({ f = apf, Q = apq })
 
+	self.ap_proto.update({ f = apf, Q = apq })
+
+	local ph_delay = self.ap_proto.phaseDelay(f)
+
 	local fgain = -0.002 / f
-	-- local fgain = 0.0
 	local fq = 0.707
 	local ff = 6000
 	self.loop_filter[1].update({ gain = fgain, f = ff, Q = fq })
 	self.loop_filter[2].update({ gain = fgain, f = ff, Q = fq })
 	self.loop_filter[3].update({ gain = fgain, f = ff, Q = fq })
+
+	self.lp_proto.update({ gain = fgain, f = ff, Q = fq })
+
+	local ph_delay2 = self.lp_proto.phaseDelay(f)
+
+	self.len_corr = -ph_delay - ph_delay2
 end
 
 params = plugin.manageParams({
@@ -382,20 +345,11 @@ params = plugin.manageParams({
 	},
 	{
 		name = "release",
-		min = 2,
-		max = 10,
-		default = 3,
+		min = 1.5,
+		max = 4,
+		default = 2,
 		changed = function(val)
 			release = 1.0 - math.exp(-val)
-		end,
-	},
-	{
-		name = "Position",
-		min = 0,
-		max = 0.5,
-		default = 0.21,
-		changed = function(val)
-			position = val
 		end,
 	},
 	{
@@ -411,6 +365,7 @@ params = plugin.manageParams({
 		name = "Coupling",
 		min = 0,
 		max = 0.01,
+		default = 0.0029,
 		changed = function(val)
 			coupling = val
 		end,
@@ -419,10 +374,11 @@ params = plugin.manageParams({
 		name = "Unison Width",
 		min = 0,
 		max = 1.0,
+		default = 0.28,
 		changed = function(val)
 			unison_width = val
 		end,
 	},
 })
 
--- params.resetToDefaults()
+params.resetToDefaults()
