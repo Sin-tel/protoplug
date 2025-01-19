@@ -8,7 +8,7 @@ local Line = require("include/dsp/fdelay_line")
 
 local balance = 1.0
 
-local kap = 0.5 -- 0.625
+local kap = 0.625
 
 local l1 = 2687
 local l2 = 4349
@@ -20,11 +20,16 @@ local feedback = 0.4
 local time = 1.0
 local t_60 = 1.0
 
+local pre_delay = 10
+
 --- init
 local line1 = Line(8000)
 local line2 = Line(8000)
 local line3 = Line(8000)
 local line4 = Line(8000)
+
+local line_pre_l = Line(8000)
+local line_pre_r = Line(8000)
 
 local apl = {}
 local apr = {}
@@ -34,13 +39,13 @@ for i = 1, 3 do
 	apl[i] = Line(800)
 	apr[i] = Line(800)
 end
-apln[1] = 41
-apln[2] = 389
-apln[3] = 227
+apln[1] = 142
+apln[2] = 107
+apln[3] = 379
 
-aprn[1] = 53
+aprn[1] = 277
 aprn[2] = 347
-aprn[3] = 251
+aprn[3] = 121
 
 local lfot = 0
 
@@ -49,20 +54,20 @@ local shelf1 = cbFilter({
 	type = "hs",
 	f = 8000,
 	gain = -3,
-	Q = 0.7,
+	Q = 0.5,
 })
 
 local shelf2 = cbFilter({
 	type = "hs",
 	f = 8000,
 	gain = -3,
-	Q = 0.7,
+	Q = 0.5,
 })
 
 local time_ = 1.0
 
 function plugin.processBlock(samples, smax)
-	for i = 0, smax do
+	for k = 0, smax do
 		lfot = lfot + 1 / 44100
 
 		local mod = 1.0 + 0.005 * math.sin(5.35 * lfot)
@@ -70,11 +75,14 @@ function plugin.processBlock(samples, smax)
 
 		time_ = time_ - (time_ - time) * 0.001
 
-		local input_l = samples[0][i]
-		local input_r = samples[1][i]
+		local input_l = samples[0][k]
+		local input_r = samples[1][k]
 
-		local sl = input_l
-		local sr = input_r
+		local sl = line_pre_l.goBack(pre_delay)
+		local sr = line_pre_r.goBack(pre_delay)
+
+		line_pre_l.push(input_l)
+		line_pre_r.push(input_r)
 
 		-- allpasses
 		for i = 1, 3 do
@@ -100,21 +108,27 @@ function plugin.processBlock(samples, smax)
 		local gain = feedback * 0.5
 
 		-- Hadamard matrix
-		local s1 = shelf1.process(sl + (d1 + d2 + d3 + d4) * gain)
-		local s2 = shelf2.process(sr + (d1 - d2 + d3 - d4) * gain)
-		local s3 = (sl + (d1 + d2 - d3 - d4) * gain)
-		local s4 = (sr + (d1 - d2 - d3 + d4) * gain)
+		local s1 = shelf1.process(d1 + d2 + d3 + d4) * gain
+		local s2 = shelf2.process(d1 - d2 + d3 - d4) * gain
+		local s3 = (d1 + d2 - d3 - d4) * gain
+		local s4 = (d1 - d2 - d3 + d4) * gain
+
+		s1 = s1 + sl
+		s2 = s2 + sr
 
 		line1.push(s1)
 		line2.push(s2)
 		line3.push(s3)
 		line4.push(s4)
 
-		sl = 0.5 * (d1 + d3)
-		sr = 0.5 * (d2 + d4)
+		-- sl = 0.5 * (d1 + d3)
+		-- sr = 0.5 * (d2 + d4)
 
-		samples[0][i] = input_l * (1.0 - balance) + sl * balance
-		samples[1][i] = input_r * (1.0 - balance) + sr * balance
+		sl = s1
+		sr = s2
+
+		samples[0][k] = input_l * (1.0 - balance) + sl * balance
+		samples[1][k] = input_r * (1.0 - balance) + sr * balance
 	end
 end
 
@@ -154,6 +168,15 @@ params = plugin.manageParams({
 		max = 1,
 		changed = function(val)
 			setFeedback(2 ^ (8 * val - 4))
+		end,
+	},
+
+	{
+		name = "Predelay",
+		min = 0,
+		max = 25,
+		changed = function(val)
+			pre_delay = val * 44100 / 1000
 		end,
 	},
 })

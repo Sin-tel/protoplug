@@ -20,6 +20,7 @@ local delay2 = Line(5000)
 local delay3 = Line(5000)
 local delay4 = Line(5000)
 
+local k_ap_in = 0.625
 local k_ap = 0.625
 
 local ap1 = Line(500)
@@ -35,24 +36,32 @@ local ap1_l = 142
 local ap2_l = 107
 local ap3_l = 379
 local ap4_l = 277
+
 local ap5_l = 905
-local ap6_l = 2656
+local ap6_l = 1956
 local ap7_l = 672
 local ap8_l = 1800
 
-local function allpass(s, ap, l)
-	local d = ap.goBack(l)
-	local v = s - k_ap * d
+local function allpass(s, ap, l, k)
+	local d = ap.goBack_int(l)
+	local v = s - k * d
 	ap.push(v)
-	return k_ap * v + d
+	return k * v + d
 end
 
--- local shelf1 = Filter({
--- 	type = "hs",
--- 	f = 8000,
--- 	gain = -3,
--- 	Q = 0.7,
--- })
+local shelf1 = Filter({
+	type = "hs",
+	f = 6000,
+	gain = -3,
+	Q = 0.5,
+})
+
+local shelf2 = Filter({
+	type = "hs",
+	f = 6000,
+	gain = -3,
+	Q = 0.5,
+})
 
 -- local function softclip(x)
 -- 	if x <= -1 then
@@ -79,10 +88,10 @@ function plugin.processBlock(samples, smax)
 		local mod = 1.0 + 0.005 * math.sin(5.35 * time)
 		local mod2 = 1.0 + 0.008 * math.sin(3.12 * time)
 
-		s = allpass(s, ap1, ap1_l)
-		s = allpass(s, ap2, ap2_l)
-		s = allpass(s, ap3, ap3_l)
-		s = allpass(s, ap4, ap4_l)
+		s = allpass(s, ap1, ap1_l, k_ap_in)
+		s = allpass(s, ap2, ap2_l, k_ap_in)
+		s = allpass(s, ap3, ap3_l, k_ap_in)
+		s = allpass(s, ap4, ap4_l, k_ap_in)
 
 		local u1 = delay1.goBack(l1 * size_ * mod)
 		local u2 = delay2.goBack(l2 * size_)
@@ -90,26 +99,27 @@ function plugin.processBlock(samples, smax)
 		local u4 = delay4.goBack(l4 * size_)
 
 		u4 = u4 + s
-		-- sign?
-		u4 = allpass(u4, ap5, ap5_l)
+		u4 = shelf1.process(u4)
+		-- sign
+		u4 = -allpass(u4, ap5, ap5_l, k_ap)
 		delay1.push(u4)
 
 		-- damping
 		u1 = u1
-		u1 = allpass(u1, ap6, ap6_l)
+		u1 = allpass(u1, ap6, ap6_l, k_ap)
 		delay2.push(u1 * feedback)
 
 		u2 = u2 + s
-		-- u2 = shelf1.process(u2)
-		u2 = allpass(u2, ap7, ap7_l)
+		u2 = shelf2.process(u2)
+		u2 = allpass(u2, ap7, ap7_l, k_ap)
 		-- u2 = softclip(u2)
 		delay3.push(u2)
 
-		u3 = allpass(u3, ap8, ap8_l)
+		u3 = allpass(u3, ap8, ap8_l, k_ap)
 		delay4.push(u3 * feedback)
 
-		local sl = u1
-		local sr = u3
+		local sl = u1 + 0.2 * u2
+		local sr = u3 + 0.2 * u4
 
 		samples[0][i] = input_l * (1.0 - balance) + sl * balance
 		samples[1][i] = input_r * (1.0 - balance) + sr * balance
@@ -151,6 +161,14 @@ params = plugin.manageParams({
 		max = 1.0,
 		changed = function(val)
 			setFeedback(2 ^ (8 * val - 4))
+		end,
+	},
+	{
+		name = "Diffusion",
+		min = 0.0,
+		max = 0.625,
+		changed = function(val)
+			k_ap_in = val
 		end,
 	},
 })
