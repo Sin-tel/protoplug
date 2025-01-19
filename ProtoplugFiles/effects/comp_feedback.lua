@@ -3,7 +3,7 @@ Feedback compressor
 1 sample delay feedback loop
 ]]
 require("include/protoplug")
-local cbFilter = require("include/dsp/cookbook filters")
+local Filter = require("include/dsp/cookbook_svf")
 
 local a = 50.0
 local b = 0.5
@@ -22,29 +22,46 @@ local attack = timeConstant(20)
 local release = timeConstant(80)
 
 stereoFx.init()
-function stereoFx.Channel:init()
+function stereoFx.Channel:init(is_left)
 	self.gain_p = 0
-	--self.high = cbFilter {type = "hp"; f = 50; gain = 0; Q = 0.7}
+	self.gain_p2 = 0
+	self.is_left = is_left
+	self.gain_filter = Filter({ type = "lp", f = 10, Q = 0.5 })
+	self.high = Filter({ type = "hp", f = 100, gain = 0, Q = 0.5 })
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		local inp = samples[i]
-		local peak = math.abs(inp * b) * self.gain_p
+		local s_in = samples[i]
+
+		local s = self.high.process(s_in)
+		local peak = math.abs(s * b) * self.gain_p
 
 		local gain = 0.5 - 0.5 * math.tanh(a * (peak - 1))
+		-- peak = math.max(0, peak - 1)
+		-- local gain = math.exp(-a * peak)
 
-		if gain < self.gain_p then
-			self.gain_p = self.gain_p - (self.gain_p - gain) * attack
+		-- self.gain_p2 = self.gain_filter.process(gain)
+		self.gain_p2 = self.gain_p2 - (self.gain_p2 - gain) * attack
+
+		if self.gain_p2 < self.gain_p then
+			-- self.gain_p = self.gain_p - (self.gain_p - self.gain_p2) * attack
+			self.gain_p = self.gain_p2
 		else
-			self.gain_p = self.gain_p - (self.gain_p - gain) * release
+			self.gain_p = self.gain_p - (self.gain_p - self.gain_p2) * release
 		end
 
 		local g = self.gain_p
 
-		--samples[i] = g
+		-- local s_out = math.tanh(s_in * g * c) * drywet + samples[i] * (1.0 - drywet)
+		local s_out = (s_in * g * c) * drywet + s_in * (1.0 - drywet)
 
-		samples[i] = math.tanh(inp * g * c) * drywet + samples[i] * (1.0 - drywet)
+		samples[i] = s_out
+		-- if self.is_left then
+		-- 	samples[i] = s_out
+		-- else
+		-- 	samples[i] = g
+		-- end
 	end
 end
 
@@ -60,16 +77,16 @@ params = plugin.manageParams({
 	},
 	{
 		name = "Feedback",
-		min = 0,
-		max = 10,
-		default = 3,
+		min = -2,
+		max = 2,
+		default = 0,
 		changed = function(val)
-			a = math.exp(val / 3.0)
+			a = math.exp(val)
 		end,
 	},
 	{
 		name = "Threshold",
-		min = -30,
+		min = -48,
 		max = 0,
 		default = -12,
 		changed = function(val)
@@ -78,18 +95,30 @@ params = plugin.manageParams({
 	},
 	{
 		name = "Attack",
-		min = 1,
-		max = 200,
-		default = 25,
+		min = 0.1,
+		max = 25,
+		default = 12,
 		changed = function(val)
 			attack = timeConstant(val)
 		end,
 	},
+	-- {
+	-- 	name = "Attack",
+	-- 	min = 0,
+	-- 	max = 2.5,
+	-- 	default = 12,
+	-- 	changed = function(val)
+	-- 		local f = 0.6 * (10 ^ (2.5 - val))
+	-- 		print(f)
+	-- 		stereoFx.RChannel.gain_filter.update({ f = f })
+	-- 		stereoFx.LChannel.gain_filter.update({ f = f })
+	-- 	end,
+	-- },
 	{
 		name = "Release",
 		min = 1,
-		max = 400,
-		default = 200,
+		max = 250,
+		default = 120,
 		changed = function(val)
 			release = timeConstant(val)
 		end,
@@ -103,6 +132,17 @@ params = plugin.manageParams({
 			c = 10 ^ (val / 20.0)
 		end,
 	},
+	{
+		name = "Highpass SC",
+		min = 10,
+		max = 140,
+		default = 12,
+		changed = function(val)
+			local f = val
+			stereoFx.RChannel.high.update({ f = f })
+			stereoFx.LChannel.high.update({ f = f })
+		end,
+	},
 })
 
-params.resetToDefaults()
+-- params.resetToDefaults()
