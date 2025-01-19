@@ -238,7 +238,7 @@ params = plugin.manageParams({
 		name = "Tune master",
 		min = -0.1,
 		max = 0.1,
-		default = 0.0694,
+		default = 0.0704,
 		changed = function(val)
 			tun_m = math.exp(val)
 		end,
@@ -247,7 +247,7 @@ params = plugin.manageParams({
 		name = "Tune offset",
 		min = -10,
 		max = 10,
-		default = -1.8,
+		default = 0.4,
 		changed = function(val)
 			tun_o = val
 		end,

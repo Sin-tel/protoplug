@@ -26,6 +26,7 @@ local function FLine(bufSize)
 	end
 	return {
 		goBack = function(dt)
+			dt = dt - 1
 			if dt ~= lastdt then
 				ptL = CalcCoeffs(dt)
 				lastdt = dt

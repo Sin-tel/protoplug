@@ -93,6 +93,7 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 		local f2 = 2.0 * f1
 
 		if tot < rattle then
+			-- NOTE: this is wrong but it sounds cool
 			tot = (tot + rattle) * f1 - rattle
 		end
 
