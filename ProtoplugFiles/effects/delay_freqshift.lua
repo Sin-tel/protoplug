@@ -1,15 +1,12 @@
 require("include/protoplug")
 local hilbert = require("include/dsp/hilbert")
-local cbFilter = require("include/dsp/cookbook filters")
+local Filter = require("include/dsp/cookbook_svf")
 
-FLine = require("include/dsp/fdelay_line")
+local Line = require("include/dsp/fdelay_line")
 
 local TWO_PI = 2 * math.pi
 
 local maxLength = 88200
-
-local even = 1 / 8
-local odd = 1 / 18
 
 local balance = 0
 local time = 1
@@ -26,14 +23,14 @@ function stereoFx.Channel:init()
 	self.hilb = hilbert()
 	self.accum = 0
 
-	self.delayline = FLine(maxLength)
+	self.delayline = Line(maxLength)
 
 	self.time = 22050
 	self.time_ = 22050
 
-	self.high = cbFilter({ type = "hp", f = 20, gain = 0, Q = 0.7 })
+	self.high = Filter({ type = "hp", f = 5, gain = 0, Q = 0.7 })
 
-	self.lp = cbFilter({
+	self.lp = Filter({
 		type = "lp",
 		f = 12000,
 		gain = 0,
@@ -86,7 +83,7 @@ params = plugin.manageParams({
 	{
 		name = "time",
 		min = 0.002,
-		max = 2,
+		max = 0.6,
 		changed = function(val)
 			time = val * 44100
 		end,

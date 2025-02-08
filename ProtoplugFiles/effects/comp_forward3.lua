@@ -40,26 +40,26 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		-- sidechain loudness weighting
 		local s_w = self.highpass.process(s_in)
-		local s_w = self.shelf.process(s_w)
+		s_w = self.shelf.process(s_w)
 
 		-- log transform
-		local peak_in = math.log(math.abs(s_w) + 0.0001) / DB_FACTOR
+		local peak = math.log(math.abs(s_w) + 0.0001) / DB_FACTOR
 
 		-- gain computer
-		local gain = peak_in - threshold
-		-- gain = math.max(0, gain)
-		if gain < -knee then
-			gain = 0
-		elseif gain < knee then
-			gain = (gain + knee) ^ 2 / (4 * knee)
+		peak = peak - threshold
+		-- peak = math.max(0, peak)
+		if peak < -knee then
+			peak = 0
+		elseif peak < knee then
+			peak = (peak + knee) ^ 2 / (4 * knee)
 		end
-		gain = (1 - ratio) * gain / ratio
+		peak = (1 - ratio) * peak / ratio
 
 		-- peak release
-		if gain < self.gain_a then
-			self.gain_a = gain
+		if peak < self.gain_a then
+			self.gain_a = peak
 		else
-			self.gain_a = self.gain_a - (self.gain_a - gain) * release
+			self.gain_a = self.gain_a - (self.gain_a - peak) * release
 		end
 
 		-- attack smoothing
@@ -69,7 +69,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 		local g = attack_mix * self.gain_b + (1 - attack_mix) * self.gain_c
 
 		-- back to linear
-		local g = math.exp((g + make_up) * DB_FACTOR)
+		g = math.exp((g + make_up) * DB_FACTOR)
 
 		g = g * balance + (1 - balance)
 
