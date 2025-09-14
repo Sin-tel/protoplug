@@ -96,26 +96,31 @@ local function Filter(args)
 			end
 		end,
 		phaseDelay = function(frequency)
-			local omegaT = 2 * math.pi * frequency / plugin.getSampleRate()
-			local real, imag = 0.0, 0.0
-			for i, b in ipairs({ b0, b1, b2 }) do
-				real = real + b / a0 * math.cos((i - 1) * omegaT)
-				imag = imag - b / a0 * math.sin((i - 1) * omegaT)
-			end
+			local omega = 2 * math.pi * frequency / plugin.getSampleRate()
+
+			-- z^{-1} = e^{-jw}
+			local c1 = math.cos(-omega)
+			local s1 = math.sin(-omega)
+
+			-- z^{-2} = e^{-2jw}
+			local c2 = math.cos(-2 * omega)
+			local s2 = math.sin(-2 * omega)
+
+			-- numerator
+			local real = b0 + b1 * c1 + b2 * c2
+			local imag = b1 * s1 + b2 * s2
 
 			local phase = math.atan2(imag, real)
 
-			real = 0.0
-			imag = 0.0
-			for i, a in ipairs({ a0, a1, a2 }) do
-				real = real + a / a0 * math.cos((i - 1) * omegaT)
-				imag = imag - a / a0 * math.sin((i - 1) * omegaT)
-			end
+			-- denominator
+			real = a0 + a1 * c1 + a2 * c2
+			imag = a1 * s1 + a2 * s2
 
 			phase = phase - math.atan2(imag, real)
-			phase = math.fmod(-phase, 2 * math.pi)
-			return phase / omegaT
+			phase = (math.pi - phase) % (2 * math.pi) - math.pi
+			return phase / omega
 		end,
+
 		process = function(x0)
 			y2, y1 = y1, y0
 			y0 = (b0 / a0) * x0 + (b1 / a0) * x1 + (b2 / a0) * x2 - (a1 / a0) * y1 - (a2 / a0) * y2
