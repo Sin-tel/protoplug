@@ -95,6 +95,8 @@ local function processMidiEvent(msg)
 		end
 		chosentrack.age = 0
 		chosentrack.note = msg:getNote()
+		chosentrack.channel = msg:getChannel()
+
 		chosentrack.noteFreq = midi.noteToFreq(chosentrack.note)
 		chosentrack.notePeriod = 1 / chosentrack.noteFreq
 		if VTrack.noteOn ~= nil then
@@ -105,7 +107,7 @@ local function processMidiEvent(msg)
 		-- note off
 		for i = 1, VTrack.numTracks do
 			local vt = VTrack.tracks[i]
-			if vt.note == msg:getNote() then
+			if vt.note == msg:getNote() and vt.channel == msg:getChannel() then
 				vt.age = 0
 				vt.note = -1
 				if VTrack.noteOff ~= nil then
