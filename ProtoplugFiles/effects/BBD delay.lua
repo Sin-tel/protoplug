@@ -6,7 +6,7 @@ with a simple lowpass to do a bit of antialiasing
 
 require("include/protoplug")
 local cbFilter = require("include/dsp/cookbook filters")
-FLine = require("include/dsp/fdelay_line")
+local Delay = require("include/dsp/fdelay_line")
 
 local maxLength = 4102
 local read = 4096
@@ -41,8 +41,8 @@ stereoFx.init()
 function stereoFx.Channel:init()
 	-- create per-channel fields (filters)
 	self.clock = 0
-	self.delayline = FLine(maxLength)
-	self.delayinterp = FLine(16)
+	self.delayline = Delay(maxLength)
+	self.delayinterp = Delay(16)
 
 	self.high = cbFilter({ type = "hp", f = 1, gain = 0, Q = 0.7 })
 

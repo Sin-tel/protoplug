@@ -1,12 +1,11 @@
 --[[
 physical model of a guitar
-
 ]]
 
 require("include/protoplug")
 
 local Line = require("include/dsp/fdelay_line")
-local cbFilter = require("include/dsp/cookbook filters")
+local Filter = require("include/dsp/cookbook_svf")
 
 local release = 0.99
 local decay = 0.99
@@ -19,15 +18,13 @@ local pitchbend = 0
 
 local pedal = false
 
-local tun_m = 1
-local tun_o = 0
+local tun_m = 0.9997
 
 local dt = 0.001
 
 function polyGen.VTrack:init()
-	-- create per-track fields here
-
 	self.f = 1
+	self.len = 10
 	self.pitch = 0
 	self.vel = 0
 	self.finished = true
@@ -45,28 +42,28 @@ function polyGen.VTrack:init()
 	self.hammer_ef = 0 -- external force
 
 	self.kap = 0.5
-	self.ap = cbFilter({
+	self.ap = Filter({
 		type = "ap",
 		f = 12000,
 		gain = 0,
 		Q = 0.7,
 	})
 
-	self.lp = cbFilter({
+	self.lp = Filter({
 		type = "hs",
 		f = 4000,
 		gain = -6,
 		Q = 0.7,
 	})
 
-	self.noisefilter = cbFilter({
+	self.noisefilter = Filter({
 		type = "bp",
 		f = 1200,
 		gain = 0,
 		Q = 1.2,
 	})
 
-	self.mutefilter = cbFilter({
+	self.mutefilter = Filter({
 		type = "hs",
 		f = 1000,
 		gain = -6,
@@ -103,7 +100,8 @@ function polyGen.VTrack:addProcessBlock(samples, smax)
 
 		nse = self.noisefilter.process(nse)
 
-		local len = 1 / (self.f * tun_m) + tun_o
+		-- local len = 1 / (self.f * tun_m) + tun_o
+		local len = self.len * tun_m
 
 		local pos = self.position
 
@@ -168,6 +166,8 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	self.pitch = self.note
 	self.f = getFreq(self.pitch + pitchbend)
 
+	self.len = 1 / self.f
+
 	--local v = vel/127
 	local v = (vel / 127) ^ 2
 	v = v + 0.024
@@ -186,6 +186,8 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	local apf = 44100 * self.f * 7
 	apf = math.min(18000, apf)
 	self.ap.update({ f = apf, Q = 0.7 })
+
+	self.len = self.len - self.ap.phaseDelay(self.f)
 
 	self.position = position + 0.05 * (math.random() - 0.5)
 
@@ -232,24 +234,6 @@ params = plugin.manageParams({
 		default = 0.21,
 		changed = function(val)
 			position = val
-		end,
-	},
-	{
-		name = "Tune master",
-		min = -0.1,
-		max = 0.1,
-		default = 0.0704,
-		changed = function(val)
-			tun_m = math.exp(val)
-		end,
-	},
-	{
-		name = "Tune offset",
-		min = -10,
-		max = 10,
-		default = 0.4,
-		changed = function(val)
-			tun_o = val
 		end,
 	},
 })

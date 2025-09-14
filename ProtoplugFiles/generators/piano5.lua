@@ -6,9 +6,8 @@ require("include/protoplug")
 
 local Line = require("include/dsp/fdelay_line")
 local Filter = require("include/dsp/cookbook_svf")
-local ProtoFilter = require("include/dsp/cookbook filters")
 
-polyGen.initTracks(2)
+polyGen.initTracks(16)
 
 local release = 0.99
 local decay = 0.99
@@ -82,8 +81,6 @@ function polyGen.VTrack:init()
 		}),
 	}
 
-	self.ap_proto = ProtoFilter({ type = "ap" })
-
 	self.loop_filter = {
 		Filter({
 			type = "hs",
@@ -95,8 +92,6 @@ function polyGen.VTrack:init()
 			type = "hs",
 		}),
 	}
-
-	self.lp_proto = ProtoFilter({ type = "hs" })
 
 	self.noise_filter = Filter({
 		type = "lp",
@@ -326,9 +321,7 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	self.ap[2].update({ f = apf, Q = apq })
 	self.ap[3].update({ f = apf, Q = apq })
 
-	self.ap_proto.update({ f = apf, Q = apq })
-
-	local ph_delay = self.ap_proto.phaseDelay(f)
+	local ph_delay = self.ap[1].phaseDelay(f)
 
 	local fgain = -0.002 / f
 	local fq = 0.707
@@ -337,9 +330,7 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 	self.loop_filter[2].update({ gain = fgain, f = ff, Q = fq })
 	self.loop_filter[3].update({ gain = fgain, f = ff, Q = fq })
 
-	self.lp_proto.update({ gain = fgain, f = ff, Q = fq })
-
-	local ph_delay2 = self.lp_proto.phaseDelay(f)
+	local ph_delay2 = self.loop_filter[1].phaseDelay(f)
 
 	self.len_corr = -ph_delay - ph_delay2
 end

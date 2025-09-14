@@ -1,17 +1,19 @@
 require("include/protoplug")
 local cbFilter = require("include/dsp/cookbook_svf")
 
+local a = 1.0
+local b = 1.0
 local balance = 1
 
-function softclip(x)
+local function softclip(x)
 	local s = math.min(math.max(x, -3.0), 3.0)
 	return s * (27.0 + s * s) / (27.0 + 9.0 * s * s)
 end
 
-function tube(x)
+local function tube(x)
 	local s = math.max(x, -1.6277)
-	local s = math.min(s, 1.8849)
-	local s = s + s * s * (1 - 0.253 * s * s * (1 - 0.091 * s * s * (1 - 0.177 * s)))
+	s = math.min(s, 1.8849)
+	s = s + s * s * (1 - 0.253 * s * s * (1 - 0.091 * s * s * (1 - 0.177 * s)))
 	return s
 end
 

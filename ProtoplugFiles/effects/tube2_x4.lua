@@ -7,20 +7,17 @@ local Downsampler31 = require("include/dsp/downsampler_31")
 local Downsampler59 = require("include/dsp/downsampler_59")
 local cbFilter = require("include/dsp/cookbook_svf")
 
-Delayline = require("include/dsp/fdelay_line")
-
-local samplerate = 44100
+local Delay = require("include/dsp/fdelay_line")
 
 local a = 0
 local b = 0
 local balance = 1
-local c = 0
 local bias = 0.4
 
 stereoFx.init()
 
-function softclip(x)
-	s = math.max(math.min(x, 3), -3)
+local function softclip(x)
+	local s = math.max(math.min(x, 3), -3)
 	return s * (27 + s * s) / (27 + 9 * s * s)
 end
 
@@ -32,7 +29,7 @@ function stereoFx.Channel:init()
 	self.downsampler = Downsampler59()
 	self.downsampler2 = Downsampler31()
 
-	self.dry_delay = Delayline(32)
+	self.dry_delay = Delay(32)
 
 	self.high = cbFilter({ type = "hp", f = 16, gain = 0, Q = 0.7 })
 

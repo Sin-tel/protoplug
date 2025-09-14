@@ -1,28 +1,35 @@
 require("include/protoplug")
-local Filter = require("include/dsp/cookbook_svf2")
---local Filter = require("include/dsp/cookbook filters")
+local Filter = require("include/dsp/cookbook filters")
+local Filter2 = require("include/dsp/cookbook_svf")
 
 local gain = 0
 
-local freq = 440
-local res = 0.7
+local freq = 153.0
+local res = 0.707
 
 local filters = {}
 
 local db_to_exp = math.log(10) / 20
 
-local filtergain = 0
-
 stereoFx.init()
 function stereoFx.Channel:init()
-	self.filter = Filter({ type = "eq", f = freq, gain = gain, Q = res })
+	self.filter = Filter({ type = "lp", f = freq, gain = gain, Q = res })
+	self.filter2 = Filter2({ type = "lp", f = freq, gain = gain, Q = res })
 
 	table.insert(filters, self.filter)
+	table.insert(filters, self.filter2)
 end
 
-function updateFilters()
+local function updateFilters()
 	for i, v in ipairs(filters) do
 		v.update({ f = freq, gain = gain, Q = res })
+	end
+	if plugin.isSampleRateKnown() then
+		local v1 = filters[1]
+		local v2 = filters[2]
+		local k1 = v1.phaseDelay(1000.0)
+		local k2 = v2.phaseDelay(1000.0)
+		print(k1, k2)
 	end
 end
 
@@ -30,7 +37,8 @@ function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
 		local inp = samples[i]
 
-		local out = self.filter.process(filtergain * inp) / filtergain
+		-- local out = self.filter.process(filtergain * inp) / filtergain
+		local out = self.filter.process(inp)
 
 		samples[i] = out
 	end
@@ -43,7 +51,6 @@ params = plugin.manageParams({
 		max = 1,
 		changed = function(val)
 			freq = 20 * math.exp(math.log(1000) * val)
-			print(freq)
 			updateFilters()
 		end,
 	},

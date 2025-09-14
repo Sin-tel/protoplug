@@ -3,16 +3,15 @@ local cbFilter = require("include/dsp/cookbook_svf")
 
 local a = 0
 local b = 0
-local c = 0
 
 local balance = 1
 
-function tanhdx(x)
-	local a = x * x
-	return ((a + 105.0) * a + 945.0) / ((15.0 * a + 420.0) * a + 945.0)
+local function tanhdx(x)
+	local x2 = x * x
+	return ((x2 + 105.0) * x2 + 945.0) / ((15.0 * x2 + 420.0) * x2 + 945.0)
 end
 
-function tube(x)
+local function tube(x)
 	return x * tanhdx(x - 0.5)
 end
 
