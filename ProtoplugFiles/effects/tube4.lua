@@ -41,7 +41,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		out = self.post.process(out)
 
-		out = softclip(out)
+		-- out = softclip(out)
 
 		out = out / a * b
 

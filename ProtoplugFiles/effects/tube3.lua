@@ -5,18 +5,17 @@ local cbFilter = require("include/dsp/cookbook_svf")
 
 local a = 0
 local b = 0
-local c = 0
 
 local balance = 1
 
-function softclip(x)
+local function softclip(x)
 	local s = math.min(math.max(x, -3.0), 3.0)
 	return s * (27.0 + s * s) / (27.0 + 9.0 * s * s)
 end
 
-function tube(x)
+local function tube(x)
 	local s = math.max(x, -0.5)
-	local s = s + s * s
+	s = s + s * s
 	return softclip(s)
 end
 

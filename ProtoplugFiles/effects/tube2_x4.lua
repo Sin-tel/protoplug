@@ -1,10 +1,10 @@
 require("include/protoplug")
-local Upsampler11 = require("include/dsp/upsampler_11")
-local Upsampler19 = require("include/dsp/upsampler_19")
-local Upsampler31 = require("include/dsp/upsampler_31")
 local Downsampler19 = require("include/dsp/downsampler_19")
 local Downsampler31 = require("include/dsp/downsampler_31")
 local Downsampler59 = require("include/dsp/downsampler_59")
+local Upsampler11 = require("include/dsp/upsampler_11")
+local Upsampler19 = require("include/dsp/upsampler_19")
+local Upsampler31 = require("include/dsp/upsampler_31")
 local cbFilter = require("include/dsp/cookbook_svf")
 
 local Delay = require("include/dsp/fdelay_line")
@@ -54,8 +54,8 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		self.dry_delay.push(s)
 
-		-- oversampling adds 20 samples of delay
-		local dry = self.dry_delay.goBack_int(20)
+		-- oversampling delay
+		local dry = self.dry_delay.goBack_int(26)
 
 		s = self.pre.process(s) * a
 

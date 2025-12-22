@@ -24,18 +24,21 @@ end
 
 local prev = 0
 
-local function randomize()
+local function randomize(seed)
+	print("---")
+	math.randomseed(seed)
 	for i = 1, max_num do
 		local x = math.random()
-		x = 100 / x
-		if x < 100 then
-			x = 100
-		end
-		if x > 1900 then
-			x = 1900
-		end
-		len[i] = x
+		x = 100 * (19 ^ x)
+
+		-- if x < 100 then
+		-- 	x = 100
+		-- end
+		-- if x > 1900 then
+		-- 	x = 1900
+		-- end
 		print(len[i])
+		len[i] = x
 	end
 end
 
@@ -47,12 +50,13 @@ function plugin.processBlock(samples, smax)
 
 		local tot = 0
 
-		local u = -prev * 2.0
+		local u = prev * 10
 
-		--u = math.max(0, u)*12
+		--u = math.max(0, u)*10
 
 		-- softmax
 		u = u + math.sqrt(u * u + 0.3)
+		--u = u*u
 
 		for i = 1, l do
 			local d = delays[i].goBack(len[i] * master_freq - u)
@@ -67,9 +71,11 @@ function plugin.processBlock(samples, smax)
 
 		tot = tot / l
 
-		if tot < -0.2 then
-			tot = (tot + 0.2) * 0.5 - 0.2
-		end
+		--tot = math.tanh(tot)
+
+		--if tot < -0.2 then
+		--	tot = (tot + 0.2) * 0.5 - 0.2
+		--end
 
 		prev = tot
 
@@ -104,7 +110,7 @@ local params = plugin.manageParams({
 	},
 	{
 		name = "number",
-		min = 0,
+		min = 1,
 		max = max_num,
 		type = "int",
 		changed = function(val)
@@ -136,11 +142,12 @@ local params = plugin.manageParams({
 		end,
 	},
 	{
-		name = "randomize",
+		name = "random seed",
 		min = 0,
-		max = 1,
+		max = 100,
+		type = "int",
 		changed = function(val)
-			randomize()
+			randomize(val)
 		end,
 	},
 })
