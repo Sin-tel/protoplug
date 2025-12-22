@@ -1,5 +1,7 @@
 require("include/protoplug")
 local cbFilter = require("include/dsp/cookbook_svf")
+local Upsampler31 = require("include/dsp/upsampler_31")
+local Downsampler59 = require("include/dsp/downsampler_59")
 
 -- basic implementation of Jiles-Atherton model,
 -- no bias correction, tape head simulation, or tape speed control
@@ -21,41 +23,54 @@ function stereoFx.Channel:init()
 	self.prev = 0
 	self.m = 0
 	self.m_irr = 0
-	self.pre = cbFilter({ type = "ls", f = 320, gain = -8, Q = 0.5 })
 
-	self.low = cbFilter({ type = "lp", f = 15000, Q = 0.7 })
+	self.pre = cbFilter({ type = "ls", f = 600, gain = -6, Q = 0.5 })
+	-- self.low = cbFilter({ type = "lp", f = 15000, Q = 0.7 })
 	self.high = cbFilter({ type = "hp", f = 10, Q = 0.7 })
+
+	self.upsampler = Upsampler31()
+	self.downsampler = Downsampler59()
+end
+
+function stereoFx.Channel:tick(s)
+	local diff = s - self.prev
+	self.prev = s
+
+	local h_eff = s + alpha * self.m
+	local m_anh = math.tanh(h_eff / a_mag)
+
+	local d_m_irr = math.sqrt(diff * diff + 0.001) * (m_anh - self.m_irr) / k
+
+	-- leaky integration to prevent build-up
+	self.m_irr = self.m_irr * 0.99 + d_m_irr
+
+	local m_rev = c * (m_anh - self.m_irr)
+
+	self.m = m_rev + self.m_irr
+
+	return self.m
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
 		local s = samples[i] * a
-		s = self.pre.process(s)
-		s = self.low.process(s)
+		s = self.pre.process(s * 0.42)
+		-- s = self.low.process(s)
 
 		s = s + math.random() * 0.001 + 0.01
-		local diff = s - self.prev
-		self.prev = s
 
-		local h_eff = s + alpha * self.m
-		local m_anh = math.tanh(h_eff / a_mag)
+		local u1, u2 = self.upsampler.tick(s)
 
-		local d_m_irr = math.sqrt(diff * diff + 0.001) * (m_anh - self.m_irr) / k
+		u1 = self:tick(u1)
+		u2 = self:tick(u2)
 
-		-- leaky integration to prevent build-up
-		self.m_irr = self.m_irr * 0.99 + d_m_irr
+		s = self.downsampler.tick(u1, u2)
 
-		local m_rev = c * (m_anh - self.m_irr)
+		s = self.high.process(s)
 
-		self.m = m_rev + self.m_irr
+		s = s * b / a
 
-		local out = self.m
-
-		out = self.high.process(out)
-
-		out = out * b / a
-
-		samples[i] = (1.0 - balance) * samples[i] + balance * out
+		samples[i] = (1.0 - balance) * samples[i] + balance * s
 	end
 end
 
