@@ -114,7 +114,7 @@ function Polyphase.new(in_coef)
 		end,
 
 		downsample = function(s0, s1)
-			local u0, u1 = process_sample(s0, s1)
+			local u0, u1 = process_sample(s1, s0)
 
 			return 0.5 * (u0 + u1)
 		end,

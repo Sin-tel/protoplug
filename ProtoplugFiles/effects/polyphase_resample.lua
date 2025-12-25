@@ -29,8 +29,6 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		local out = self.downsampler.downsample(u1, u2)
 
-		-- out = self:tick(s)
-
 		samples[i] = out
 	end
 end
