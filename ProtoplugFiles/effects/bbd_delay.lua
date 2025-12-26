@@ -1,6 +1,6 @@
 --[[
 bucket brigade delay
-the bbd itself runs at a variable (noninteger) samplerate 
+the bbd itself runs at a variable (noninteger) samplerate
 with a simple lowpass to do a bit of antialiasing
 ]]
 
@@ -8,17 +8,17 @@ require("include/protoplug")
 local cbFilter = require("include/dsp/cookbook filters")
 local Delay = require("include/dsp/fdelay_line")
 
-local maxLength = 4102
+local max_len = 4102
 local read = 4096
 
 local feedback = 0
 local balance = 0.5
 
-local lpfilters = {}
-local lp2filters = {}
+local lp_filters = {}
+local lp_filters2 = {}
 
-local lfoFreq = 2 * math.pi * 1 / 44100
-local lfoMod = 1.0
+local lfo_freq = 2 * math.pi * 1 / 44100
+local lfo_mod = 1.0
 
 local jitter = 0.2
 
@@ -41,32 +41,30 @@ stereoFx.init()
 function stereoFx.Channel:init()
 	-- create per-channel fields (filters)
 	self.clock = 0
-	self.delayline = Delay(maxLength)
-	self.delayinterp = Delay(16)
+	self.delayline = Delay(max_len)
+	self.delay_interp = Delay(16)
 
 	self.high = cbFilter({ type = "hp", f = 1, gain = 0, Q = 0.7 })
 
 	self.lp = cbFilter({
 		type = "lp",
 		f = 12000,
-		gain = 0,
 		Q = 0.7,
 	})
-	table.insert(lpfilters, self.lp)
+	table.insert(lp_filters, self.lp)
 	self.lp2 = cbFilter({
 		type = "lp",
 		f = 12000,
-		gain = 0,
 		Q = 1.0,
 	})
-	table.insert(lp2filters, self.lp2)
+	table.insert(lp_filters2, self.lp2)
 
-	self.lfoPhase = 0.0
+	self.lfo_phase = 0.0
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		self.lfoPhase = self.lfoPhase + lfoFreq
+		self.lfo_phase = self.lfo_phase + lfo_freq
 
 		local input = samples[i]
 
@@ -81,15 +79,15 @@ function stereoFx.Channel:processBlock(samples, smax)
 		signal = self.high.process(signal)
 		signal = self.lp2.process(signal)
 
-		self.delayinterp.push(signal)
+		self.delay_interp.push(signal)
 
 		self.clock = self.clock
 			+ freq
 			+ 0.02 * (math.random() - 0.5) * jitter
-			+ 0.05 * math.sin(self.lfoPhase) * lfoMod * freq
+			+ 0.05 * math.sin(self.lfo_phase) * lfo_mod * freq
 		if self.clock >= 1.0 then
 			self.clock = self.clock % 1
-			local interp = self.delayinterp.goBack(5.0 + self.clock)
+			local interp = self.delay_interp.goBack(5.0 + self.clock)
 			self.delayline.push(interp)
 		end
 
@@ -124,7 +122,7 @@ params = plugin.manageParams({
 		min = 0,
 		max = 5,
 		changed = function(val)
-			updateFilters(lp2filters, { f = 22000 * math.exp(val - 5) })
+			updateFilters(lp_filters2, { f = 22000 * math.exp(val - 5) })
 		end,
 	},
 	{
@@ -134,7 +132,7 @@ params = plugin.manageParams({
 		max = 20,
 		changed = function(val)
 			freq = 1.0 / val
-			updateFilters(lpfilters, { f = 22000 / val })
+			updateFilters(lp_filters, { f = 22000 / val })
 		end,
 	},
 	{
@@ -143,7 +141,7 @@ params = plugin.manageParams({
 		min = 0.5,
 		max = 10,
 		changed = function(val)
-			lfoFreq = 2 * math.pi * val / 44100
+			lfo_freq = 2 * math.pi * val / 44100
 		end,
 	},
 	{
@@ -152,7 +150,7 @@ params = plugin.manageParams({
 		min = 0,
 		max = 1,
 		changed = function(val)
-			lfoMod = val
+			lfo_mod = val
 		end,
 	},
 	{

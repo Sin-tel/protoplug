@@ -1,7 +1,6 @@
 -- compression before softclipping, then applies the inverse gain after to maintain dynamics
 
 require("include/protoplug")
-local cbFilter = require("include/dsp/cookbook filters")
 
 local b = 1
 local c = 1
@@ -23,15 +22,15 @@ function stereoFx.Channel:init()
 	self.peak = 0
 end
 
-function softclip(x)
+local function softclip(x)
 	local s = math.min(math.max(x, -3.0), 3.0)
 	return s * (27.0 + s * s) / (27.0 + 9.0 * s * s)
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		local inp = samples[i]
-		local peak = inp * inp
+		local input = samples[i]
+		local peak = input * input
 
 		if peak < self.peak then
 			self.peak = self.peak - (self.peak - peak) * attack
@@ -41,13 +40,13 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		local p = math.sqrt(self.peak)
 
-		local g = (1 - balance) + balance * b * c / (p + b)
+		local g = b * c / (p + b)
 
-		local s = inp * g
+		local s = input * g
 
 		s = softclip(s) / g
 
-		samples[i] = s
+		samples[i] = input * (1.0 - balance) + s * balance
 	end
 end
 
