@@ -2,8 +2,8 @@
 
 require("include/protoplug")
 
-local Polyphase = require("include/dsp/polyphase")
 local Filter = require("include/dsp/cookbook_svf")
+local Polyphase = require("include/dsp/polyphase")
 local COEFS = Polyphase.presets.coef_8
 
 -- global dsp

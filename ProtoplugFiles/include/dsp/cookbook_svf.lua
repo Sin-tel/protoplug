@@ -12,7 +12,7 @@ local function Filter(args)
 	local sample_rate = 44100
 	local ic1eq = 0
 	local ic2eq = 0
-	local params = { type = "lp", f = 440, gain = 0, Q = 1 }
+	local params = { type = "lp", f = 440, gain = 0, Q = 1, oversample = 1 }
 	args = args or {}
 	for l, v in pairs(args) do
 		params[l] = v
@@ -29,7 +29,7 @@ local function Filter(args)
 				return
 			end
 
-			sample_rate = plugin.getSampleRate()
+			sample_rate = plugin.getSampleRate() * params.oversample
 
 			local ff = params.f / sample_rate
 			ff = math.min(ff, 0.49)
