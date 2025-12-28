@@ -13,9 +13,7 @@ end)
 
 local TWO_PI = 2 * math.pi
 
--- use short length for "instant" tape effect, long for delays
-local LEN = 16384
--- local LEN = 512
+local LEN = 30000
 
 local drive = 1.0
 local drive_inv = 1.0
@@ -47,15 +45,6 @@ local sweep = 0
 
 local jitter = 0.
 
-local function lagrange4(y0, y1, y2, y3, a)
-	local c0 = y1
-	local c1 = y2 - (1.0 / 3.0) * y0 - 0.5 * y1 - (1.0 / 6.0) * y3
-	local c2 = 0.5 * (y0 + y2) - y1
-	local c3 = (1.0 / 6.0) * (y3 - y0) + 0.5 * (y1 - y2)
-
-	return ((c3 * a + c2) * a + c1) * a + c0
-end
-
 local function hermite4(y0, y1, y2, y3, a)
 	local c0 = y1
 	local c1 = 0.5 * (y2 - y0)
@@ -65,13 +54,7 @@ local function hermite4(y0, y1, y2, y3, a)
 	return ((c3 * a + c2) * a + c1) * a + c0
 end
 
--- hermite tends to give slightly less aliasing
-local use_lagrange = false
-
 local interpolate = hermite4
-if use_lagrange then
-	interpolate = lagrange4
-end
 
 stereoFx.init()
 function stereoFx.Channel:init(left)
@@ -117,11 +100,21 @@ function stereoFx.Channel:init(left)
 	self.post_lp1 = Filter({ type = "lp", oversample = 2, f = 2000, Q = 0.5412 })
 	self.post_lp2 = Filter({ type = "lp", oversample = 2, f = 2000, Q = 1.3066 })
 
-	-- pre-emph
-	self.pre = Filter({ type = "ls", f = 600, gain = -6, Q = 0.5 })
+	self.fb_filter = Filter({ type = "ls", f = 120, gain = -6, Q = 0.7 })
+	self.fb_filter2 = Filter({ type = "hs", f = 2000, gain = -6, Q = 0.7 })
 
 	-- DC killer
 	self.high = Filter({ type = "hp", f = 10, gain = 0, Q = 0.7 })
+end
+
+function stereoFx.Channel:read(h)
+	local h_int = math.floor(h)
+	local frac = h - h_int
+	local y0 = self.buffer[h_int % LEN]
+	local y1 = self.buffer[(h_int + 1) % LEN]
+	local y2 = self.buffer[(h_int + 2) % LEN]
+	local y3 = self.buffer[(h_int + 3) % LEN]
+	return interpolate(y0, y1, y2, y3, frac)
 end
 
 function stereoFx.Channel:tick_magnetic(s)
@@ -171,13 +164,13 @@ function stereoFx.Channel:tick_tape(x)
 	self.x1 = x
 
 	-- output interpolation
-	local frac = self.accum
+	local head = self.head + self.accum
 
-	local y0 = self.buffer[self.head % LEN]
-	local y1 = self.buffer[(self.head + 1) % LEN]
-	local y2 = self.buffer[(self.head + 2) % LEN]
-	local y3 = self.buffer[(self.head + 3) % LEN]
-	local out = interpolate(y0, y1, y2, y3, frac)
+	-- local out = self:read(head)
+
+	local lfo = 0.05 * lfo_mod * math.sin(self.lfo_phase + self.lfo_phase_offset + 0.36 * TWO_PI)
+	local head2 = head + LEN * 0.39 * (1.0 + lfo)
+	local out = 0.8 * (self:read(head2) + self:read(head))
 
 	if use_filters then
 		out = self.post_lp1.process(out)
@@ -225,13 +218,14 @@ function stereoFx.Channel:processBlock(samples, smax)
 		self.speed = self.speed * (1.0 + mod)
 
 		local in_s = samples[i]
-		-- pre-emphasis to cancel magnetic model response
-		in_s = self.pre.process(in_s)
 
 		local s = in_s + self.prev * feedback_amt
 
 		-- tweak to get unity gain
 		s = s * 0.45
+
+		s = self.fb_filter.process(s)
+		s = self.fb_filter2.process(s)
 
 		-- noise and DC bias
 		s = s + math.random() * 0.0001
