@@ -1,0 +1,73 @@
+We have a chain of n all-pass filters with a single feedback loop
+
+     u  ┌────┐  ┌────┐       ┌────┐
+x ─┬───►│ AP │─►│ AP │─►...─►│ AP │─┬─► y
+   │    └────┘  └────┘       └────┘ │
+   └───────────────◄────────────────┘
+                  *-k
+
+The chain without feedback loop can be expressed as a linear function:
+
+    y[n] = G * u[n] + S[n]
+
+Where G is the "instantaneous gain" and S the total state respone.
+
+At 'u' we have (dropping [n]):
+
+    u = x - k * y
+
+Substitute y:
+
+    u = x - k * (G * u + S)
+
+Solve for u:
+
+    u = (x - k * S) / (1 + k * G)
+
+We then put some kind of nonlinearity at the input of the chain.
+If we linearize around u ~ 0, this adds no additional gain if f'(0) = 1.
+We use this linear estimate to update the state directly without doing any iterative solve.
+
+Another way to think about this is to do a single iteration of Newton-Raphson, with an initial guess of 0.
+Let's assume we put a tanh clipper at the input. The state update then becomes:
+
+    u = x - k * (G * tanh(u) + S)
+
+Express this as a root-finding problem:
+
+    f(u) = u + k * (G * tanh(u) + S) - x = 0
+    f'(u) = 1 + k * G * tanh'(u)
+
+Newton-Raphson update:
+
+    u' = u - f(u) / f'(u)
+       = u - (u + k * (G * tanh(u) + S) - x) / (1 + k * G * tanh'(u))
+
+Plug in u = 0:
+
+    u' = -(k * (G * tanh(0) + S) - x) / (1 + k * G * tanh'(0))
+       = (x - k * S) / (1 + k * G)
+
+## Calculating G and S
+
+Single all-pass stage:
+
+       v         *k
+ x ───┬───────┬───►───┬────► y
+      │     ┌─┴──┐    │
+      │     │z^-1│    ▲
+      │     └─┬──┘    │
+      └──◄────┴───────┘
+        *-k    s
+
+    v = x - k*s
+    y = k*v + s
+      = k*(x - k*s) + s
+      = k*x + (1 - k^2)*s
+
+=>  The gain (G) contribution is k.
+    The state (S) contribution is (1 - k^2)*s.
+    The previous state s_{i-1} passes through this stage's input so in total:
+        S_i = k*S_{i-1} + (1 - k^2)*s_i
+
+Then loop over all stages 0..i and accumulate G and S.

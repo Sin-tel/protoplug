@@ -1,6 +1,4 @@
---[[
-n pole phase with zero delay feedback path
-]]
+-- see phaser_sdf_notes.txt for derivation
 
 require("include/protoplug")
 
@@ -12,6 +10,8 @@ plugin.addHandler("prepareToPlay", function()
 end)
 
 local k_val = 3.0
+
+-- nr of stages
 local l = 8
 local feedback = 0
 local balance = 1.0
@@ -61,16 +61,14 @@ function stereoFx.Channel:processBlock(samples, smax)
 		-- lfo mod
 		self.lfo_phase = self.lfo_phase + lfo_freq
 		local lfo = lfo_mod * math.sin(self.lfo_phase + self.lfo_phase_offset)
-		local kap = compute_kap(self.k_val + lfo)
+		local k = -compute_kap(self.k_val + lfo)
+		local k2 = (1.0 - k * k)
 
 		local input = samples[i]
 
 		local x = input
 
 		-- compute feedback loop
-		local k = -kap
-		local k2 = (1.0 - k * k)
-
 		local G = 1
 		local S = 0
 
@@ -79,7 +77,6 @@ function stereoFx.Channel:processBlock(samples, smax)
 			S = S * k + self.ap[j] * k2
 		end
 
-		-- one iteration of newton-rhapson with guess = 0
 		local u = (x - feedback * S) / (1 + feedback * G)
 
 		-- update state
