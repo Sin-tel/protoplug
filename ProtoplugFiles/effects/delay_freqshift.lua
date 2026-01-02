@@ -1,6 +1,6 @@
 require("include/protoplug")
-local hilbert = require("include/dsp/hilbert")
 local Filter = require("include/dsp/cookbook_svf")
+local Hilbert = require("include/dsp/hilbert")
 
 local Line = require("include/dsp/fdelay_line")
 
@@ -20,7 +20,7 @@ local lpfilters = {}
 
 stereoFx.init()
 function stereoFx.Channel:init()
-	self.hilb = hilbert()
+	self.hilbert = Hilbert.new()
 	self.accum = 0
 
 	self.delayline = Line(maxLength)
@@ -49,7 +49,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		local r, c
 
-		r, c = self.hilb.process(inp - d * feedback)
+		r, c = self.hilbert.process(inp - d * feedback)
 		self.accum = self.accum + freq
 		self.accum = self.accum % 1
 		local phase = TWO_PI * self.accum

@@ -3,13 +3,13 @@ limiter with hilbert peak estimation
 ]]
 
 require("include/protoplug")
-local hilbert = require("include/dsp/hilbert")
+local Hilbert = require("include/dsp/hilbert")
 
 local TWO_PI = 2 * math.pi
 
 stereoFx.init()
 function stereoFx.Channel:init()
-	self.hilb = hilbert()
+	self.hilbert = Hilbert.new()
 	self.accum = 0
 end
 
@@ -19,7 +19,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		local r, c
 
-		r, c = self.hilb.process(inp)
+		r, c = self.hilbert.process(inp)
 		self.accum = self.accum + freq
 		self.accum = self.accum % 1
 		local phase = TWO_PI * self.accum

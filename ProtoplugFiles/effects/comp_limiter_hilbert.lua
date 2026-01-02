@@ -3,7 +3,7 @@ limiter with hilbert peak estimation
 ]]
 
 require("include/protoplug")
-local hilbert = require("include/dsp/hilbert")
+local Hilbert = require("include/dsp/hilbert")
 
 require("include/protoplug")
 
@@ -15,29 +15,33 @@ local function timeConstant(x)
 end
 
 local release = timeConstant(80)
+local use_hilbert = true
 
-local filters = {}
+local function clip(x)
+	return math.min(math.max(x, -1.0), 1.0)
+end
 
 stereoFx.init()
-function stereoFx.Channel:init()
-	self.filter = hilbert()
+function stereoFx.Channel:init(left)
+	self.filter = Hilbert.new()
 
 	self.gain_p = 0
 
-	table.insert(filters, self.filter)
+	self.left = left
 end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		local inp = samples[i]
+		local s = samples[i]
 
 		local r, c
 
-		--
-		r, c = self.filter.process(inp)
+		r, c = self.filter.process(s)
 
-		local peak = math.sqrt(r * r + c * c)
-		--local peak = math.abs(r)
+		local peak = math.abs(s)
+		if use_hilbert then
+			peak = math.sqrt(r * r + c * c)
+		end
 
 		local gain = math.min(1.0, 1.0 / peak)
 
@@ -47,9 +51,17 @@ function stereoFx.Channel:processBlock(samples, smax)
 			self.gain_p = self.gain_p - (self.gain_p - gain) * release
 		end
 
+		-- TODO: delay compensation
 		local g = self.gain_p
+		local out = g * s
+		-- if self.left then
+		-- 	out = peak
+		-- end
 
-		samples[i] = r * g
+		-- hardclip any peaks we might have missed
+		out = clip(out)
+
+		samples[i] = out
 	end
 end
 
@@ -61,6 +73,16 @@ params = plugin.manageParams({
 		default = 20,
 		changed = function(val)
 			release = timeConstant(val)
+		end,
+	},
+
+	{
+		name = "use hilbert",
+		type = "list",
+		values = { "off", "on" },
+		default = "on",
+		changed = function(val)
+			use_hilbert = (val == "on")
 		end,
 	},
 })
