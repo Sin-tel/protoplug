@@ -3,7 +3,7 @@ exclude_files = { "**/lib/*.lua" }
 std = "max+protoplug"
 stds.protoplug = {
    globals = { "polyGen", "stereoFx", "processMidi", "plugin", "params" },
-   read_globals = { "ffi", "midi" },
+   read_globals = { "ffi", "midi", "juce" },
 }
 
 ignore = {

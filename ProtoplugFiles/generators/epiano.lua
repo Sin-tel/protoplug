@@ -86,7 +86,6 @@ function processMidi(msg)
 		if msg:getControlNumber() == 64 then
 			pedal = msg:getControlValue() ~= 0
 		end
-		print(pedal)
 	end
 end
 

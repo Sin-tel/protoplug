@@ -123,11 +123,10 @@ end
 
 function polyGen.VTrack:update_bank()
 	for i = 1, MAX_HARMONICS do
-		local ih = 0.01 * inharm
-		fi = fi * math.sqrt(1 + ih * i * i) / math.sqrt(1 + ih)
+		local fi = self.harm[i]
+		-- local ih = 0.01 * inharm
+		-- fi = fi * math.sqrt(1 + ih * i * i) / math.sqrt(1 + ih)
 		-- fi = fi + inharm * (i - 1) * (i - 1)
-
-		-- local fi = self.harm[i]
 
 		local f = self.f * fi
 

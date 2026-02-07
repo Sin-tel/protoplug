@@ -37,8 +37,13 @@ local ap2_l = 107
 local ap3_l = 379
 local ap4_l = 277
 
-local ap5_l = 905
-local ap6_l = 1956
+-- local ap5_l = 905
+-- local ap6_l = 1956
+-- local ap7_l = 672
+-- local ap8_l = 1800
+
+local ap5_l = 908
+local ap6_l = 2656
 local ap7_l = 672
 local ap8_l = 1800
 
@@ -63,15 +68,10 @@ local shelf2 = Filter({
 	Q = 0.5,
 })
 
--- local function softclip(x)
--- 	if x <= -1 then
--- 		return -2.0 / 3.0
--- 	elseif x >= 1 then
--- 		return 2.0 / 3.0
--- 	else
--- 		return x - (x * x * x) / 3.0
--- 	end
--- end
+local function clip(x)
+	local s = math.min(math.max(x, -5 / 4), 5 / 4)
+	return s - (256. / 3125.) * s ^ 5
+end
 
 function plugin.processBlock(samples, smax)
 	for i = 0, smax do
@@ -80,16 +80,20 @@ function plugin.processBlock(samples, smax)
 
 		size_ = size_ - (size_ - size) * 0.001
 
-		local s = 0.5 * (input_l + input_r)
+		local sl = input_l
+		local sr = input_r
 
 		time = time + 1 / 44100
 
 		-- local mod = math.sin(time * 2.5) * 64.0
-		local mod = 1.0 + 0.005 * math.sin(5.35 * time)
-		local mod2 = 1.0 + 0.008 * math.sin(3.12 * time)
+		local mod = 1.0 + 0.010 * math.sin(5.35 * time)
+		local mod2 = 1.0 + 0.012 * math.sin(3.12 * time)
+
+		local s = sl + sr
 
 		s = allpass(s, ap1, ap1_l, k_ap_in)
 		s = allpass(s, ap2, ap2_l, k_ap_in)
+
 		s = allpass(s, ap3, ap3_l, k_ap_in)
 		s = allpass(s, ap4, ap4_l, k_ap_in)
 
@@ -99,9 +103,11 @@ function plugin.processBlock(samples, smax)
 		local u4 = delay4.goBack(l4 * size_)
 
 		u4 = u4 + s
+		u4 = clip(u4)
 		u4 = shelf1.process(u4)
 		-- sign
 		u4 = -allpass(u4, ap5, ap5_l, k_ap)
+
 		delay1.push(u4)
 
 		-- damping
@@ -110,19 +116,19 @@ function plugin.processBlock(samples, smax)
 		delay2.push(u1 * feedback)
 
 		u2 = u2 + s
+		u2 = clip(u2)
 		u2 = shelf2.process(u2)
-		u2 = allpass(u2, ap7, ap7_l, k_ap)
-		-- u2 = softclip(u2)
+		u2 = -allpass(u2, ap7, ap7_l, k_ap)
 		delay3.push(u2)
 
 		u3 = allpass(u3, ap8, ap8_l, k_ap)
 		delay4.push(u3 * feedback)
 
-		local sl = u1 + 0.2 * u2
-		local sr = u3 + 0.2 * u4
+		local out_l = u3 --+ 0.2 * u4
+		local out_r = u1 --+ 0.2 * u2
 
-		samples[0][i] = input_l * (1.0 - balance) + sl * balance
-		samples[1][i] = input_r * (1.0 - balance) + sr * balance
+		samples[0][i] = input_l * (1.0 - balance) + out_l * balance
+		samples[1][i] = input_r * (1.0 - balance) + out_r * balance
 	end
 end
 
@@ -166,9 +172,10 @@ params = plugin.manageParams({
 	{
 		name = "Diffusion",
 		min = 0.0,
-		max = 0.625,
+		max = 1.0,
 		changed = function(val)
-			k_ap_in = val
+			k_ap_in = 0.625 * val
+			k_ap = 0.625 * val
 		end,
 	},
 })

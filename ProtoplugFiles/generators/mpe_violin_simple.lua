@@ -44,6 +44,9 @@ end
 function polyGen.VTrack:init()
     self.channel = 0
 
+    self.note_on = false
+    self.active = false
+
     self.f_ = 0
     self.pres_ = 0
 
@@ -59,6 +62,17 @@ end
 local function curve(x)
     local g = 1 - x
     return 1 - g * g
+end
+
+local function findTrack(i)
+    local target
+    for j = 1, polyGen.VTrack.numTracks do
+        local vt = polyGen.VTrack.tracks[j]
+        if vt.channel == i then
+            target = vt
+        end
+    end
+    return target
 end
 
 function processMidi(msg)
@@ -90,86 +104,84 @@ end
 function polyGen.VTrack:addProcessBlock(samples, smax)
     local ch = channels[self.channel]
 
-    if ch then
-        for i = 0, smax do
-            local a = attack
-            if self.pres_ > ch.pressure then
-                a = release
-            end
-            self.pres_ = self.pres_ - (self.pres_ - ch.pressure) * a
+    if not ch then
+        return
+    end
+    if not self.active then
+        return
+    end
 
-            --self.f_ = self.f_ - (self.f_ - ch.f)*0.002
-
-            local fa = ch.f - self.f_
-            self.fv = self.fv + freq * (fa - 0.4 * self.fv)
-            self.fv = math.tanh(self.fv * 0.7 / self.f_) * (self.f_ / 0.7)
-            self.f_ = self.f_ + freq * self.fv
-
-            local nse2 = math.random() - 0.5
-
-            self.noise2 = self.noise2 - (self.noise2 - nse2) * 0.004
-
-            local addn = self.pres_ * self.pres_ * self.f_
-
-            local nse = math.random() - 0.5
-
-            self.noise = self.noise - (self.noise - nse) * 0.2
-
-            self.phase = self.phase + (self.f_ * TWOPI) + nse * 0.5 * addn + self.noise2 * 0.1 * self.f_
-
-            local out = math.sin(self.phase + self.fdbck * (self.pres_ * 0.5 + 0.6) + self.noise * 0.1)
-
-            --self.phase = self.phase + (self.f_*TWOPI)
-            --local out = math.sin(self.phase +  self.fdbck*(self.pres_*0.5+0.8))
-
-            self.fdbck = out
-
-            local samp = out * self.pres_
-
-            samples[0][i] = samples[0][i] + samp * 0.1 -- left
-            samples[1][i] = samples[1][i] + samp * 0.1 -- right
+    for i = 0, smax do
+        local a = attack
+        if self.pres_ > ch.pressure then
+            a = release
         end
+        self.pres_ = self.pres_ - (self.pres_ - ch.pressure) * a
+
+        --self.f_ = self.f_ - (self.f_ - ch.f)*0.002
+
+        local fa = ch.f - self.f_
+        self.fv = self.fv + freq * (fa - 0.4 * self.fv)
+        self.fv = math.tanh(self.fv * 0.7 / self.f_) * (self.f_ / 0.7)
+        self.f_ = self.f_ + freq * self.fv
+
+        local nse2 = math.random() - 0.5
+
+        self.noise2 = self.noise2 - (self.noise2 - nse2) * 0.004
+
+        local addn = self.pres_ * self.pres_ * self.f_
+
+        local nse = math.random() - 0.5
+
+        self.noise = self.noise - (self.noise - nse) * 0.2
+
+        self.phase = self.phase + (self.f_ * TWOPI) + nse * 0.5 * addn + self.noise2 * 0.1 * self.f_
+
+        local out = math.sin(self.phase + self.fdbck * (self.pres_ * 0.5 + 0.6) + self.noise * 0.1)
+
+        --self.phase = self.phase + (self.f_*TWOPI)
+        --local out = math.sin(self.phase +  self.fdbck*(self.pres_*0.5+0.8))
+
+        self.fdbck = out
+
+        local samp = out * self.pres_
+
+        samples[0][i] = samples[0][i] + samp * 0.1 -- left
+        samples[1][i] = samples[1][i] + samp * 0.1 -- right
+    end
+
+    if not self.note_on and self.pres_ < 0.01 then
+        self.active = false
     end
 end
 
 function polyGen.VTrack:noteOff(note, ev)
     local i = ev:getChannel()
     local ch = channels[i]
-
     ch.pressure = 0
+
+    local target = findTrack(i)
+    target.note_on = false
 end
 
 function polyGen.VTrack:noteOn(note, vel, ev)
     local i = ev:getChannel()
 
-    local vtrack = self
-
-    local assignNew = true
-    for j = 1, polyGen.VTrack.numTracks do
-        local vt = polyGen.VTrack.tracks[j]
-        if vt.channel == i then
-            assignNew = false
-            vtrack = vt
-        end
-    end
-
-    --if assignNew then
-    vtrack.channel = i
-    --end
-
     local ch = channels[i]
-
     ch.pitch = note
-
     ch.pressure = 0
 
+    local target = findTrack(i) or self
+    -- local target = self
+    target.channel = i
+    target.note_on = true
+    target.active = true
+
     setPitch(ch)
-    vtrack.f_ = ch.f
+    target.f_ = ch.f
 end
 
 params = plugin.manageParams({
-    -- automatable VST/AU parameters
-    -- note the new 1.3 way of declaring them
     {
         name = "Attack",
         min = 4,

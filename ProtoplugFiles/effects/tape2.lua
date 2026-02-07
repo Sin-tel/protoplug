@@ -34,7 +34,7 @@ function stereoFx.Channel:init()
 	self.m = 0
 	self.m_irr = 0
 
-	self.tape_filter = Filter({ type = "ls", f = 600, gain = -6, Q = 0.5 })
+	-- self.tape_filter = Filter({ type = "ls", f = 600, gain = -6, Q = 0.5 })
 	self.high = Filter({ type = "hp", f = 10, Q = 0.7 })
 
 	self.pre_emph = Filter({ type = "hs", f = 1000, gain = 10, Q = 0.7 })
@@ -54,7 +54,8 @@ function stereoFx.Channel:tick(s)
 	local h_eff = s + alpha * self.m
 
 	local m_anh = tanh(h_eff / a_mag)
-	local k2 = math.sqrt(diff * diff + 0.001) / k
+	-- local k2 = math.sqrt(diff * diff + 0.0001) / k
+	local k2 = math.abs(diff) / k
 	k2 = 1.0 - math.exp(-k2)
 	local d_m_irr = k2 * (m_anh - self.m_irr)
 	self.m_irr = self.m_irr + d_m_irr
@@ -72,15 +73,17 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		s = self.pre_emph.process(s)
 		s = self.low.process(s)
-		s = self.tape_filter.process(s * 0.42)
+		s = s * 0.42
+		s = self.tape_filter.process(s)
 
-		s = s + math.random() * 0.001 + 0.01
+		-- s = s + math.random() * 0.001 + 0.01
 
 		local u1, u2 = self.upsampler.upsample(s)
 		u1 = self:tick(u1)
 		u2 = self:tick(u2)
 		s = self.downsampler.downsample(u1, u2)
 
+		-- s = self.tape_filter.process(s)
 		s = self.high.process(s)
 		s = self.post_emph.process(s)
 

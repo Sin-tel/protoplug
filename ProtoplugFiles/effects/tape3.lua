@@ -95,7 +95,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 			local env_in = math.abs(s)
 			self.env_in = self.env_in - (self.env_in - env_in) * env_s
 
-			s = 0.5 * s
+			s = 0.25 * s
 		end
 
 		-- noise
@@ -110,7 +110,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 		s = self.high.process(s)
 
 		if compander_on then
-			s = 2 * s
+			s = 4 * s
 
 			-- output 1:2 expansion (feedforward)
 			local env_out = math.abs(s)

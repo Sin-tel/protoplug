@@ -142,6 +142,10 @@ function polyGen.initTracks(n)
 				VTrack.tracks[i]:addProcessBlock(samples, smax)
 			end
 		end
+
+		if polyGen.processBlockGlobal then
+			polyGen.processBlockGlobal(samples, smax)
+		end
 	end
 
 	script.addHandler("init", function()

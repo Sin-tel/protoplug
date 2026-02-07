@@ -4,8 +4,8 @@ another attempt at piano
 
 require("include/protoplug")
 
-local Line = require("include/dsp/fdelay_line")
 local Filter = require("include/dsp/cookbook_svf")
+local Line = require("include/dsp/fdelay_line")
 
 polyGen.initTracks(16)
 

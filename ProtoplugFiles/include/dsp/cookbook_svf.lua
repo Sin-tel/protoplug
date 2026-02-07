@@ -34,6 +34,9 @@ local function Filter(args)
 			local ff = params.f / sample_rate
 			ff = math.min(ff, 0.49)
 
+			if params.Q then
+				assert(params.Q > 0)
+			end
 			g = math.tan(math.pi * ff)
 			k = 1.0 / params.Q
 			local a = math.pow(10, params.gain / 40)
@@ -129,6 +132,19 @@ local function Filter(args)
 			ic2eq = 2.0 * v2 - ic2eq
 
 			return m0 * v0 + m1 * v1 + m2 * v2
+		end,
+
+		-- Calculate instantaneous response.
+		-- Given some input x, the output is y = G*x + S
+		predict = function()
+			local G = m0 + m1 * a2 + m2 * a3
+
+			local v3 = -ic2eq
+			local v1 = a1 * ic1eq + a2 * v3
+			local v2 = ic2eq + a2 * ic1eq + a3 * v3
+			local S = m1 * v1 + m2 * v2
+
+			return G, S
 		end,
 
 		phaseDelay = function(frequency)

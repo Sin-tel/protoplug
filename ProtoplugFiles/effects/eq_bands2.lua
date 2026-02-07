@@ -1,30 +1,21 @@
--- parallel "passive" analog-style EQ, with a tube stage
-
 require("include/protoplug")
-local Filter = require("include/dsp/cookbook_svf2")
+local Filter = require("include/dsp/cookbook_svf")
 
-local Filter_linear = require("include/dsp/cookbook_svf")
+local gain_low = 0
 
 local f1 = 250
-local f2 = 180
-local f3 = 750
-local f4 = 3200
-local f5 = 2500
+local f2 = 220
+local f3 = 770
+local f4 = 3000
+local f5 = 6600
+
+local res = 0.6
 
 local filters1 = {}
 local filters2 = {}
 local filters3 = {}
 local filters4 = {}
 local filters5 = {}
-
-local gain1 = 1
-local gain5 = 1
-
-local filtergain = 0
-
-local function gainf(x)
-	return math.pow(10, x / 20) - 1
-end
 
 local function softclip(x)
 	local s = math.min(math.max(x, -3.0), 3.0)
@@ -40,12 +31,12 @@ end
 stereoFx.init()
 function stereoFx.Channel:init()
 	self.filter1 = Filter({ type = "lp", f = f1, gain = 0, Q = 0.3 })
-	self.filter2 = Filter({ type = "eq", f = f2, gain = 0, Q = 0.4 })
-	self.filter3 = Filter({ type = "eq", f = f3, gain = 0, Q = 0.4 })
-	self.filter4 = Filter({ type = "eq", f = f4, gain = 0, Q = 0.4 })
-	self.filter5 = Filter({ type = "hp", f = f5, gain = 0, Q = 0.3 })
+	self.filter2 = Filter({ type = "eq", f = f2, gain = 0, Q = 0.5 })
+	self.filter3 = Filter({ type = "eq", f = f3, gain = 0, Q = 0.6 })
+	self.filter4 = Filter({ type = "eq", f = f4, gain = 0, Q = 0.5 })
+	self.filter5 = Filter({ type = "hs", f = f5, gain = 0, Q = 0.5 })
 
-	self.hp = Filter_linear({ type = "hp", f = 10, gain = 0, Q = 0.7 })
+	self.hp = Filter({ type = "hp", f = 5, gain = 0, Q = 0.7 })
 
 	table.insert(filters1, self.filter1)
 	table.insert(filters2, self.filter2)
@@ -62,23 +53,21 @@ end
 
 function stereoFx.Channel:processBlock(samples, smax)
 	for i = 0, smax do
-		local inp = samples[i]
+		local s = samples[i]
 
-		local s1 = inp * filtergain
+		local s_low = gain_low * self.filter1.process(s)
+		s = self.filter2.process(s)
+		s = self.filter3.process(s)
+		s = self.filter4.process(s)
+		s = self.filter5.process(s)
 
-		local s2 = 0
-		s2 = s2 + gain1 * self.filter1.process(s1)
-		s2 = s2 + (self.filter2.process(s1) - s1)
-		s2 = s2 + (self.filter3.process(s1) - s1)
-		s2 = s2 + (self.filter4.process(s1) - s1)
-		s2 = s2 + gain5 * self.filter5.process(s1)
+		s = s + s_low
 
-		-- boost second harmonic generation
-		s2 = tube(s2 * 0.25) * 4
+		s = tube(s * 0.25) * 4
 
-		local out = inp + s2 / filtergain
+		local out = s
 
-		--out = self.hp.process(out)
+		out = self.hp.process(out)
 
 		samples[i] = out
 	end
@@ -90,8 +79,7 @@ params = plugin.manageParams({
 		min = -18,
 		max = 18,
 		changed = function(val)
-			gain1 = gainf(val)
-			updateFilters(filters1, val)
+			gain_low = 10 ^ (val / 20) - 1.0
 		end,
 	},
 	{
@@ -123,16 +111,7 @@ params = plugin.manageParams({
 		min = -18,
 		max = 18,
 		changed = function(val)
-			gain5 = gainf(val)
 			updateFilters(filters5, val)
-		end,
-	},
-	{
-		name = "drive",
-		min = -36,
-		max = 12,
-		changed = function(val)
-			filtergain = math.pow(10, val / 20)
 		end,
 	},
 })

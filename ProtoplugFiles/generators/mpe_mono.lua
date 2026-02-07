@@ -10,6 +10,23 @@ local pedal = false
 local TWOPI = 2 * math.pi
 local freq = 6 * TWOPI / 44100
 
+local scale = {
+    0,
+    181.1,
+    267,
+    291.4,
+    472.6,
+    497.1,
+    678.2,
+    702.7,
+    788.5,
+    969.6,
+    994.1,
+    1175.2,
+}
+
+local cents_offset = (scale[10] - 900)
+
 local function newChannel()
     local new = {}
 
@@ -137,7 +154,7 @@ end
 function polyGen.VTrack:noteOff(note, ev)
     local i = ev:getChannel()
     local ch = channels[i]
-    print(i, "off")
+    -- print(i, "off")
     ch.pressure = 0
 
     local maxpres = 0
@@ -154,14 +171,14 @@ function polyGen.VTrack:noteOff(note, ev)
     if maxpres > 0.01 then
         self.channel = maxi
         self.f_ = channels[maxi].f
-        print(self.channel, "active")
+        -- print(self.channel, "active")
     end
 end
 
 function polyGen.VTrack:noteOn(note, vel, ev)
     local i = ev:getChannel()
     --activech = i
-    print(i, "on")
+    -- print(i, "on")
 
     local assignNew = true
     for j = 1, polyGen.VTrack.numTracks do
@@ -177,7 +194,11 @@ function polyGen.VTrack:noteOn(note, vel, ev)
 
     local ch = channels[i]
 
-    ch.pitch = note
+    local oct = math.floor(note / 12)
+    local nn = note % 12
+
+    local cents = scale[nn + 1] - cents_offset
+    ch.pitch = oct * 12 + cents / 100
 
     ch.pressure = 0
 

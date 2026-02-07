@@ -13,7 +13,8 @@ end)
 
 local TWO_PI = 2 * math.pi
 
-local LEN = 30000
+-- about a second at 44.1kHz
+local LEN = 40000
 
 local drive = 1.0
 local drive_inv = 1.0
@@ -22,13 +23,17 @@ local drive_inv = 1.0
 local speed_target = 1
 local feedback_amt = 0.0
 local balance = 0.5
-local use_filters = true
+
+local h1_gain = 0.
+local h2_gain = 0.
+local h3_gain = 1.
 
 -- tape params
 local c = 0.5
 local alpha = 0.1
 local a_mag = 0.28
 local k = 1
+local use_filters = true
 
 -- wow
 local lfo_freq = TWO_PI * 0.4 / sample_rate
@@ -54,8 +59,6 @@ local function hermite4(y0, y1, y2, y3, a)
 	return ((c3 * a + c2) * a + c1) * a + c0
 end
 
-local interpolate = hermite4
-
 stereoFx.init()
 function stereoFx.Channel:init(left)
 	self.speed = 1.0
@@ -65,6 +68,11 @@ function stereoFx.Channel:init(left)
 	self.x1 = 0.
 	self.x2 = 0.
 	self.x3 = 0.
+
+	self.h1_gain = 0.
+	self.h2_gain = 0.
+	self.h3_gain = 1.
+	self.lfo_mod = 0.
 
 	-- wow
 	self.lfo_phase_offset = 0
@@ -91,7 +99,7 @@ function stereoFx.Channel:init(left)
 	self.upsampler = Polyphase.new(COEFS)
 	self.downsampler = Polyphase.new(COEFS)
 
-	self.speed_filter = Filter({ type = "lp", f = 1.2, Q = 0.6 })
+	self.speed_filter = Filter({ type = "lp", f = 0.6, Q = 0.5 })
 
 	-- 4 pole butterworth cascades
 	self.pre_lp1 = Filter({ type = "lp", oversample = 2, f = 2000, Q = 0.5412 })
@@ -100,8 +108,10 @@ function stereoFx.Channel:init(left)
 	self.post_lp1 = Filter({ type = "lp", oversample = 2, f = 2000, Q = 0.5412 })
 	self.post_lp2 = Filter({ type = "lp", oversample = 2, f = 2000, Q = 1.3066 })
 
-	self.fb_filter = Filter({ type = "ls", f = 120, gain = -6, Q = 0.7 })
-	self.fb_filter2 = Filter({ type = "hs", f = 2000, gain = -6, Q = 0.7 })
+	self.noise_filter = Filter({ type = "lp", f = 850, Q = 0.7 })
+
+	self.fb_filter = Filter({ type = "hp", f = 200, Q = 0.7 })
+	self.fb_filter2 = Filter({ type = "hs", f = 2700, gain = -3, Q = 0.7 })
 
 	-- DC killer
 	self.high = Filter({ type = "hp", f = 10, gain = 0, Q = 0.7 })
@@ -110,17 +120,14 @@ end
 function stereoFx.Channel:read(h)
 	local h_int = math.floor(h)
 	local frac = h - h_int
-	local y0 = self.buffer[h_int % LEN]
-	local y1 = self.buffer[(h_int + 1) % LEN]
-	local y2 = self.buffer[(h_int + 2) % LEN]
-	local y3 = self.buffer[(h_int + 3) % LEN]
-	return interpolate(y0, y1, y2, y3, frac)
+	local y0 = self.buffer[(h_int - 1) % LEN]
+	local y1 = self.buffer[h_int % LEN]
+	local y2 = self.buffer[(h_int + 1) % LEN]
+	local y3 = self.buffer[(h_int + 2) % LEN]
+	return hermite4(y0, y1, y2, y3, frac)
 end
 
 function stereoFx.Channel:tick_magnetic(s)
-	-- modified Jiles-Atherton model
-	-- uses a simple fwd Euler update
-
 	local diff = s - self.prev_t
 	self.prev_t = s
 
@@ -128,8 +135,6 @@ function stereoFx.Channel:tick_magnetic(s)
 	local m_anh = math.tanh(h_eff / a_mag)
 
 	local k2 = math.sqrt(diff * diff + 0.001) / k
-
-	-- stability fix
 	k2 = 1.0 - math.exp(-k2)
 	self.d = self.m_irr + k2 * (m_anh - self.m_irr)
 
@@ -149,12 +154,14 @@ function stereoFx.Channel:tick_tape(x)
 	local step = self.speed
 	self.accum = self.accum + step
 
+	x = self:tick_magnetic(x * drive) * drive_inv
+
 	while self.accum >= 1.0 do
 		self.accum = self.accum - 1.0
 
 		-- input interpolation
 		local a = self.accum / (step + 1e-6)
-		local x_interp = interpolate(x, self.x1, self.x2, self.x3, a)
+		local x_interp = hermite4(x, self.x1, self.x2, self.x3, a)
 
 		self.buffer[self.head] = x_interp
 		self.head = (self.head + 1) % LEN
@@ -164,20 +171,28 @@ function stereoFx.Channel:tick_tape(x)
 	self.x1 = x
 
 	-- output interpolation
-	local head = self.head + self.accum
+	local read = self.head + self.accum
 
-	-- local out = self:read(head)
+	self.lfo_phase = self.lfo_phase + 0.27 * TWO_PI * self.speed / LEN
 
-	local lfo = 0.05 * lfo_mod * math.sin(self.lfo_phase + self.lfo_phase_offset + 0.36 * TWO_PI)
-	local head2 = head + LEN * 0.39 * (1.0 + lfo)
-	local out = 0.8 * (self:read(head2) + self:read(head))
+	local h1_mod = 400.0 * self.lfo_mod * math.sin(self.lfo_phase * 1.53 + self.lfo_phase_offset)
+	local h2_mod = 400.0 * self.lfo_mod * math.sin(self.lfo_phase * 1.21 + self.lfo_phase_offset)
+	local h3_mod = 400.0 * self.lfo_mod * math.sin(self.lfo_phase * 0.97 + self.lfo_phase_offset)
+
+	local head1 = read - LEN * 0.270 + h1_mod
+	local head2 = read - LEN * 0.600 + h2_mod
+	local head3 = read - LEN * 0.951 + h3_mod
+
+	local h1 = self:read(head1)
+	local h2 = self:read(head2)
+	local h3 = self:read(head3)
+
+	local out = h1 * self.h1_gain + h2 * self.h2_gain + h3 * self.h3_gain
 
 	if use_filters then
 		out = self.post_lp1.process(out)
 		out = self.post_lp2.process(out)
 	end
-
-	out = self:tick_magnetic(out * drive) * drive_inv
 
 	return out
 end
@@ -193,16 +208,18 @@ function stereoFx.Channel:processBlock(samples, smax)
 	end
 
 	for i = 0, smax do
+		-- parameter interpolation
+		self.h1_gain = self.h1_gain + 0.01 * (h1_gain - self.h1_gain)
+		self.h2_gain = self.h2_gain + 0.01 * (h2_gain - self.h2_gain)
+		self.h3_gain = self.h3_gain + 0.01 * (h3_gain - self.h3_gain)
+		self.lfo_mod = self.lfo_mod + 0.01 * (lfo_mod - self.lfo_mod)
+
 		self.speed = self.speed_filter.process(speed_target)
 
-		-- jitter
-		local mod = 0.2 * jitter * (math.random() - 0.5)
+		local mod = 0.0
 
-		-- wow
-		-- rate depends on speed / length of the tape
-		self.lfo_phase = self.lfo_phase + 0.27 * TWO_PI * self.speed / LEN
-		local lfo = 0.05 * lfo_mod * math.sin(self.lfo_phase + self.lfo_phase_offset)
-		mod = mod + lfo
+		-- jitter
+		mod = mod + 0.5 * jitter * self.noise_filter.process(math.random() - 0.5)
 
 		-- flutter
 		flutter_rate = next_rate * fl_rate_change + flutter_rate * (1 - fl_rate_change)
@@ -212,23 +229,23 @@ function stereoFx.Channel:processBlock(samples, smax)
 			sweep = 0.0
 			next_rate = 0.02 + (math.random() * 0.98)
 		end
-		mod = mod + 0.05 * flutter_depth * math.sin(sweep)
+		mod = mod + 0.03 * flutter_depth * math.sin(sweep)
 
 		-- add modulation to speed
 		self.speed = self.speed * (1.0 + mod)
 
+		-- input
 		local in_s = samples[i]
-
 		local s = in_s + self.prev * feedback_amt
 
 		-- tweak to get unity gain
-		s = s * 0.45
+		s = s * 0.47
 
 		s = self.fb_filter.process(s)
 		s = self.fb_filter2.process(s)
 
 		-- noise and DC bias
-		s = s + math.random() * 0.0001
+		s = s * (1.0 + math.random() * 0.01)
 		s = s + 0.01
 
 		local u1, u2 = self.upsampler.upsample(s)
@@ -257,7 +274,7 @@ params = plugin.manageParams({
 	{
 		name = "speed",
 		min = 0.25,
-		max = 1,
+		max = 1.5,
 		default = 1,
 		changed = function(val)
 			speed_target = val
@@ -272,18 +289,16 @@ params = plugin.manageParams({
 			feedback_amt = val
 		end,
 	},
-
 	{
 		name = "drive",
-		min = -24,
-		max = 24,
+		min = -12,
+		max = 12,
 		default = 0,
 		changed = function(val)
 			drive = 10 ^ (val / 20)
 			drive_inv = 1 / drive
 		end,
 	},
-
 	{
 		name = "wow",
 		min = 0,
@@ -293,7 +308,6 @@ params = plugin.manageParams({
 			lfo_mod = val * val
 		end,
 	},
-
 	{
 		name = "flutter",
 		min = 0,
@@ -304,7 +318,6 @@ params = plugin.manageParams({
 			sweep_trim = (0.0005 * flutter_depth)
 		end,
 	},
-
 	{
 		name = "jitter",
 		min = 0,
@@ -312,6 +325,37 @@ params = plugin.manageParams({
 		default = 0.5,
 		changed = function(val)
 			jitter = val * val
+		end,
+	},
+	{
+		name = "mode",
+		type = "list",
+		values = { "1", "2", "3", "1+3", "2+3" },
+		default = "3",
+		changed = function(val)
+			if val == "1" then
+				h1_gain = 1.0
+				h2_gain = 0.0
+				h3_gain = 0.0
+			elseif val == "2" then
+				h1_gain = 0.0
+				h2_gain = 1.0
+				h3_gain = 0.0
+			elseif val == "3" then
+				h1_gain = 0.0
+				h2_gain = 0.0
+				h3_gain = 1.0
+			elseif val == "1+3" then
+				h1_gain = 0.707
+				h2_gain = 0.0
+				h3_gain = 0.707
+			elseif val == "2+3" then
+				h1_gain = 0.0
+				h2_gain = 0.707
+				h3_gain = 0.707
+			else
+				assert(false, "unreachable")
+			end
 		end,
 	},
 })

@@ -33,8 +33,6 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		local g = self.gain_p
 
-		--samples[i] = g
-
 		samples[i] = inp * g
 	end
 end

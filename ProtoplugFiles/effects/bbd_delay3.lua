@@ -10,7 +10,8 @@ local COEFS = Polyphase.presets.coef_8
 local sample_rate = 44100
 local inv_2sr = 1.0 / 88200
 
-local STAGES = 4096
+local n_stages = 4096
+local MAX_STAGES = 8192
 
 -- parameters
 local clock_rate = 10000
@@ -32,22 +33,17 @@ end
 local env_s = time_constant(100.0)
 
 -- distortion
-local even = 0.025
-local odd = 0.01
+local even = 0.05 --0.025
+local odd = 0.02 --0.01
 
-local function dist(x)
-	if x > 1 then
-		return 1 - odd - even
-	elseif x < -1 then
-		return -1 + odd - even
-	else
-		return x - even * x * x - odd * x * x * x
-	end
+local function clip(x)
+	local s = math.min(math.max(x, -5 / 4), 5 / 4)
+	return s - (256. / 3125.) * s ^ 5
 end
 
-local function softclip(x)
-	local s = math.min(math.max(x, -3.0), 3.0)
-	return s * (27.0 + s * s) / (27.0 + 9.0 * s * s)
+local function dist(x)
+	x = clip(x)
+	return x - even * x * x - odd * x * x * x
 end
 
 plugin.addHandler("prepareToPlay", function()
@@ -63,7 +59,7 @@ function stereoFx.Channel:init(left)
 		self.lfo_phase_offset = 0.5 * math.pi
 	end
 	self.accum = 0.
-	self.prev_in = 0.
+	self.x1 = 0.
 	self.prev = 0.
 	self.s = 0.
 	self.jitter = 1.0
@@ -71,7 +67,7 @@ function stereoFx.Channel:init(left)
 	self.lfo_phase = 0.
 
 	self.buffer = {}
-	for i = 0, STAGES do
+	for i = 0, MAX_STAGES do
 		self.buffer[i] = 0.0
 	end
 	self.head = 0
@@ -103,8 +99,7 @@ function stereoFx.Channel:tick(x)
 	self.accum = self.accum + step
 
 	-- input distortion
-	x = dist(x)
-	-- x = softclip(0.1 + x * 0.5) * 2.0
+	x = dist(x * 0.5) * 2
 
 	local out = self.s
 
@@ -113,23 +108,23 @@ function stereoFx.Channel:tick(x)
 
 		-- input interpolation
 		local a = self.accum / step
-		local x_lerp = x * (1.0 - a) + self.prev_in * a
+		local x_lerp = x * (1.0 - a) + self.x1 * a
 
 		-- bucket brigade
 		self.buffer[self.head] = x_lerp
 
 		self.head = self.head + 1
-		if self.head >= STAGES then
-			self.head = 0
-		end
+		self.head = self.head % MAX_STAGES
 
-		local delayed_sample = self.buffer[self.head]
+		local read = (self.head - n_stages) % MAX_STAGES
+
+		local delayed_sample = self.buffer[read]
 
 		-- output interpolation
-		local prev_s = self.s
+		local s1 = self.s
 		self.s = delayed_sample
 
-		out = prev_s * (1.0 - a) + self.s * a
+		out = s1 * (1.0 - a) + self.s * a
 
 		-- update clock jitter
 		if jitter_amount > 0 then
@@ -140,7 +135,7 @@ function stereoFx.Channel:tick(x)
 		end
 	end
 
-	self.prev_in = x
+	self.x1 = x
 	return out
 end
 
@@ -173,7 +168,7 @@ function stereoFx.Channel:processBlock(samples, smax)
 		end
 
 		-- noise
-		s = s + 0.003 * (math.random() - 0.5)
+		-- s = s + 0.003 * (math.random() - 0.5)
 
 		-- run the BBD with 2x oversampling
 		local u1, u2 = self.upsampler.upsample(s)
@@ -203,12 +198,27 @@ params = plugin.manageParams({
 	{
 		name = "Clock Rate",
 		min = 2000,
-		max = 40000,
+		max = 64000,
 		default = 15000,
 		changed = function(val)
-			clock_rate = val
+			clock_rate = math.floor(val / 4000) * 4000
+			if clock_rate < 2000 then
+				clock_rate = 2000
+			end
+			print(clock_rate)
 		end,
 	},
+
+	-- {
+	-- 	name = "Clock Rate",
+	-- 	type = "list",
+	-- 	values = { "2k", "3k", "4k", "6k", "8k", "12k", "16k", "24k", "32k", "48k", "64k" },
+	-- 	default = "12k",
+	-- 	changed = function(val)
+	-- 		clock_rate = tonumber(val:sub(1, val:len() - 1)) * 1000
+	-- 		print(clock_rate)
+	-- 	end,
+	-- },
 	{
 		name = "Feedback",
 		min = 0,
@@ -253,7 +263,21 @@ params = plugin.manageParams({
 		max = 1,
 		default = 0,
 		changed = function(val)
-			jitter_amount = 0.8 * val * val
+			jitter_amount = 0.2 * val * val
+		end,
+	},
+
+	{
+		name = "double",
+		type = "list",
+		values = { "off", "on" },
+		default = "off",
+		changed = function(val)
+			if val == "on" then
+				n_stages = 8192
+			else
+				n_stages = 4096
+			end
 		end,
 	},
 })
