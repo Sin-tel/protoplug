@@ -53,13 +53,13 @@ function stereoFx.Channel:processBlock(samples, smax)
 
 		-- TODO: delay compensation
 		local g = self.gain_p
-		local out = g * s
+		local out = g * r
 		-- if self.left then
 		-- 	out = peak
 		-- end
 
 		-- hardclip any peaks we might have missed
-		out = clip(out)
+		-- out = clip(out)
 
 		samples[i] = out
 	end
